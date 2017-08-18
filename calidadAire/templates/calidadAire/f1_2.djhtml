@@ -1,0 +1,169 @@
+{% extends "f1.djhtml" %}
+{% load staticfiles%}
+<!-- Modification Register -->
+<!-- Modification 20170717: Added the table range data selector whit some format added depending type of data range, year and month -->
+<!-- Modification 20170727 Removed the crs token becouse is innesesary on the context of GET request. Added an "All" option on the monitoring  station action button-->
+
+<!-- Variables used for Django -->
+<!-- year_list The list of years saved on the system database -->
+<!-- station_list: Dictionary containing the (id) and the (monitoringPlace) of each monitoring station contained on the system.
+     The variable is an dictionary in this format {idStation: monitoringPlace, idStation2: monitoringPlace2, ..}-->
+<!-- tableStation_list: Dictionary containing the following variables in this format {imecaStation: imecaDate, imecaStation2: imecaDate2, ..} -->
+<!-- imecaStation: Contains the name of the place which the station monitors -->
+<!-- imecaDate: Contains a string describing the Range which the table is displaying.
+     Example: Dia 22/Enero/2015
+     Mes Enero/2015
+     Año 2015-->
+<!-- End Description tableStation_list -->
+<!-- imecaData_list: Variable containing a list of list whit IMECAS corresponding to certain time span. The first element of each list i the time span that it cover, will be hours, days or months; next the imecas Values in this corresponding order:
+     "Ozono", "Óxido de Nitrógeno", "Dióxido de Nitrógeno", "NOx", "Dióxido de Azufre", "Óxido de Carbono", "Particulas Contaminantes (10 Micrones)", "Particulas Contaminantes (2.5 Micrones)"-->
+<!-- tableType: Variable containing the type of table it is, 1 for 'Dia', 2 for 'Mes' and 3 for 'Año' -->
+{% block customcss %}
+    <link rel="stylesheet" type="text/css" href="{% static "css/f1_2.css" %}">
+{% endblock %}
+{% block title %}SCAZAC: Datos IMECA{% endblock %}
+{% block middleprogram %}
+    <div id="containerDescription" class = "row" align="center">
+	<div class="col-md-12 center-block">
+	    
+	    <button data-toggle="collapse" data-target="#info" class="btn">Seleccione el rango en el que quiere mostrar los datos.</button>
+	    <div id="info" class="collapse">
+		Dia: Se mostraran todos los IMECA de cada contaminante por hora del dia seleccionado.<br>
+		Mes: Se mostraran todos los IMECA de cada contaminante por dia del mes seleccionado.<br>
+		Año: Se mostraran todos los IMECA de cada contaminante por mes del año seleccionado.<br>
+		Los IMECAS mostrados seran promedios representando el rango seleccionado.
+	    </div>
+	</div>
+    </div>
+    
+    <div class="row">
+	<div class="col-md-12">
+	    <form action="{% url 'calidadAire:DatosIMECA' %}" class="form-inline" method="get"><!-- 20170727: Added directions where to and the type of method -->
+		<div class="tagForm">Seleccione Rango</div>
+		<select id="range" name="range" class="form-control">
+		    <option value="1">Dia</option>
+		    <option value="2">Mes</option>
+		    <option value="3">Año</option>
+		</select>
+		<div class="tagForm">Estación</div>
+		<select name="station" class="form-control">
+		    {% for idStation, monitoringPlace in station_list.iteritems %}
+			<option value="{{ idStation }}">{{ monitoringPlace }}</option>
+		    {% endfor %}
+		    <option value="A">Todos</option><!-- 20170727: Added to have an option which involvs all the stations -->
+		</select>
+		<div class="tagForm">Año</div>
+		<select id="year" name="year" class="form-control">
+		    {% for year in year_list %}
+			<option value="{{ year }}">{{ year }}</option>
+		    {% endfor %}
+		</select>
+		<div id="idMonth" class="tagForm">Mes</div>
+		<select id="month" name="month" class="form-control"><!-- Se pondran todos los meses como todos los dias de tal manera que si se escoge un rango de pfecha inexistente se mandara un mensaje de error indicando que dicho dia no existe-->
+		    <option value="01">Enero</option>
+		    <option value="02">Febrero</option>
+		    <option value="03">Marzo</option>
+		    <option value="04">Abril</option>
+		    <option value="05">Mayo</option>
+		    <option value="06">Junio</option>
+		    <option value="07">Julio</option>
+		    <option value="08">Agosto</option>
+		    <option value="09">Septiembre</option>
+		    <option value="10">Octubre</option>
+		    <option value="11">Noviembre</option>
+		    <option value="12">Diciembre</option>
+		</select>
+		<div id="idDay" class="tagForm">Dia</div>
+		<select id="day" name="day" class="form-control">
+		    <option value="01">1</option>
+		    <option value="02">2</option>
+		    <option value="03">3</option>
+		    <option value="04">4</option>
+		    <option value="05">5</option>
+		    <option value="06">6</option>
+		    <option value="07">7</option>
+		    <option value="08">8</option>
+		    <option value="09">9</option>
+		    <option value="10">10</option>
+		    <option value="11">11</option>
+		    <option value="12">12</option>
+		    <option value="13">13</option>
+		    <option value="14">14</option>
+		    <option value="15">15</option>
+		    <option value="16">16</option>
+		    <option value="17">17</option>
+		    <option value="18">18</option>
+		    <option value="19">19</option>
+		    <option value="20">20</option>
+		    <option value="21">21</option>
+		    <option value="22">22</option>
+		    <option value="23">23</option>
+		    <option value="24">24</option>
+		    <option value="25">25</option>
+		    <option value="26">26</option>
+		    <option value="27">27</option>
+		    <option value="28">28</option>
+		    <option id="feb29" value="29">29</option>
+		    <option id="feb30" value="30">30</option>
+		    <option id="all31" value="31">31</option>
+		</select>
+		<button type="submit" class="btn-primary">Busqueda de Datos</button>
+	    </form>
+	</div>
+    </div>
+    {% for imecaStation, imecaDate in tableStation_list.iteritems %}
+	
+	<div class="row containerDescription" align="center">
+	    <div class="col-md-12 center-block">
+		Tabla IMECA Estación:{{ imecaStation }}, {{ imecaDate }}
+	    </div>
+	</div>
+	<div class="row" align="center">
+	    <div class="col-md-12 center-block">
+		{% for imecaData in imecaData_list %}
+		    <div class="table-responsive">
+			<table class="table-bordered">
+			    <thead>
+				<tr>
+				    {% if tableType == 1 %}
+					<th>Hora</th>
+				    {% elif tableType == 2 %}
+					<th>Dia</th>
+				    {% else %}
+					<th>Mes</th>
+				    {% endif %}
+				    <th>Ozono</th>
+				    <th>Óxido de Nitrógeno</th>
+				    <th>Dióxido de Nitrógeno</th><!-- Added 20170728: Missing attribute -->
+				    <th>NOx</th>
+				    <th>Dióxido de Azufre</th>
+				    <th>Óxido de Carbono</th>
+				    <th>Particulas de Contaminantes (10 Micrones)</th>
+				    <th>Particulas de Contaminantes (2.5 Micrones)</th>
+				</tr>
+			    </thead>
+			    <tbody>
+				{% for imeca in imecaData %}
+				    <tr>
+					<td class="imeca-data" >{{ imeca.0 }}&zwnj;</td><!-- The class imeca-data will be uses to select the color of each td element Modified 20170807: Insert invisible character in order to maintain the white color-->
+					<td class="imeca-data" >{{ imeca.1 }}</td>
+					<td class="imeca-data" >{{ imeca.2 }}</td>
+					<td class="imeca-data" >{{ imeca.3 }}</td>
+					<td class="imeca-data" >{{ imeca.4 }}</td>
+					<td class="imeca-data" >{{ imeca.5 }}</td>
+					<td class="imeca-data" >{{ imeca.6 }}</td>
+					<td class="imeca-data" >{{ imeca.7 }}</td>
+					<td class="imeca-data" >{{ imeca.8 }}</td>
+				    </tr>
+				{% endfor %}
+			    </tbody>
+			</table>
+		    </div> 
+		{% endfor %}
+	    </div>
+	</div>
+    {% endfor %}
+{% endblock %}
+{% block customjs %}
+    <script src="{% static "js/f1_2.js" %}" ></script>
+{% endblock %}

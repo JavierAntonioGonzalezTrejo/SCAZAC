@@ -1,0 +1,18 @@
+#map {
+    height: 500px;
+}
+#good{
+    background: green;
+}
+#regular{
+    background: yellow;
+}
+#bad{
+    background: orange;
+}
+#veryBad{
+    background: red;
+}
+#xbad{
+    background: purple;
+}

@@ -1,0 +1,50 @@
+{% extends "f1.djhtml" %}
+{% load staticfiles%}
+<!-- Modification Register -->
+<!-- Created 20170808 -->
+{% block customcss %}
+    <link rel="stylesheet" type="text/css" href="{% static "css/f1_3.css" %}"><!-- Bug 20170812: changed f1_1.css to f1_3.css -->
+{% endblock %}
+{% block title %}SCAZAC: Reportes{% endblock %}
+{% block middleprogram %}
+    <div class="row">
+	<div class="col-md-12">
+	    {% if activeReport %}<!-- If there is any report, make the carousel, if not shows a message -->
+		<div id="carouselReports" class="carousel slide" data-ride="carousel">
+		    <div class="carousel-inner" role="listbox">
+			
+			<div class="carousel-item active">
+			    <a class ="reportImage" href="{{ activeReport.fileLocation.url }}">
+				<img class="d-block img-fluid" src="{{ activeReport.cover.url }}"  data-holder-rendered="true">
+			    </a>
+			</div>
+			
+			{% for report in reports_List %}
+			    <div class="carousel-item">
+				<a class ="reportImage" href="{{ report.fileLocation.url }}">
+				    <img class="d-block img-fluid" src="{{ report.cover.url }}"  data-holder-rendered="true">
+				</a>
+			    </div>
+			{% endfor %}
+			
+		    </div>
+		    <a class="carousel-control-prev arrowCarousel" href="#carouselReports" role="button" data-slide="prev">
+			<img class="arrowCarousel" src="{% static "img/arrowcoruselLeft.png" %}" aria-hidden="true"></span>
+			<span class="sr-only">Previous
+			</span>
+		    </a>
+		    <a class="carousel-control-next arrowCarousel" href="#carouselReports" role="button" data-slide="next">
+			<img  class="arrowCarousel" src="{% static "img/arrowcoruselRigth.png" %}" aria-hidden="true">
+			<span class="sr-only">Next
+			</span>
+		    </a>
+		</div>
+	    {% else %}
+		ERROR 404: <br>
+		SIN REPORTES POR EL MOMENTO!!
+	    {% endif %}
+	</div>
+    </div>
+{% endblock %}
+{% block customjs %}    
+{% endblock %}

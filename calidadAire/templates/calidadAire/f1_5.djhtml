@@ -1,0 +1,16 @@
+{% extends "f1.djhtml" %}
+{% load staticfiles%}
+<!-- Modification Register -->
+<!-- Created 20170812 -->
+{% block customcss %}
+{% endblock %}
+{% block title %}SCAZAC: Normatividad{% endblock %}
+{% block middleprogram %}
+    <div class = "row" align="center">
+	<div class="col-md-12 center-block">
+	    <h1>EN PROCESO</h1>
+	</div>
+    </div>
+{% endblock %}
+{% block customjs %}    
+{% endblock %}

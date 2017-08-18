@@ -1,0 +1,61 @@
+{% extends "f1.djhtml" %}
+{% load staticfiles%}
+<!-- Modification Register -->
+<!-- Created 20170811 -->
+{% block customcss %}
+{% endblock %}
+{% block title %}SCAZAC: Normatividad{% endblock %}
+{% block middleprogram %}
+    <div class = "row" align="center">
+	<div class="col-md-12 center-block">
+	    <p><i class="fa fa-quote-left pull-left"></i>Se tienen niveles establecidos de concentración y tiempos de exposición de los contaminantes donde el ciudadano promedio puede desenvolverse sin que se afecte de forma significativa su salud. Estos niveles son establecidos por las Normas Oficiales Mexicanas para la Calidad del Aire. Los niveles de la norma ambiental para cada contaminante son diferentes, ya que la vulnerabilidad del ser humano es diferente ante cada tipo de contaminante. El IMECA toma el valor de concentración y el tiempo de exposición que establece la norma ambiental para cada contaminante y lo asigna a los 100 puntos IMECA. De esta manera para cualquier contaminante se tiene la misma escala de ponderación en la unidad adimensional del IMECA.<i class="fa fa-quote-right"></i></p>
+	</div>
+    </div>
+    <div class = "row" align="center">
+	<div class="col-md-12 center-block">
+	    <table class="table table-striped">
+		<thead>
+		    <tr>
+			<th>Contaminante</th>
+			<th>Abreviación</th>
+			<th>Norma</th>
+		    </tr>
+		</thead>
+		<tbody>
+		    <tr>
+			<td>Ozono</td>
+			<td>O3</td>
+			<td><a href="{% static "normas/nom-020-ssa1-2014.pdf" %}" target="_blank"><i class="fa fa-file-pdf-o"></i></a> NOM-020-SSAI-2014</td>
+		    </tr>
+		    <tr>
+			<td>Dióxido de Nitrógeno</td>
+			<td>NO2</td>
+			<td><a href="{% static "normas/nom-023-ssa1-1993.pdf" %}" target="_blank"><i class="fa fa-file-pdf-o"></i></a> NOM-023-SSAI-1993</td>
+		    </tr>
+		    <tr>
+			<td>Dióxido de Azufre</td>
+			<td>SO2</td>
+			<td><a href="{% static "normas/nom-022-ssa1-2010.pdf" %}" target="_blank"><i class="fa fa-file-pdf-o"></i></a> NOM-022-SSAI-2010</td>
+		    </tr>
+		    <tr>
+			<td>Óxido de Carbono</td>
+			<td>CO</td>
+			<td><a href="{% static "normas/nom-021-ssa1-1993.pdf" %}" target="_blank"><i class="fa fa-file-pdf-o"></i></a> NOM-021-SSAI-1993</td>
+		    </tr>
+		    <tr>
+			<td>Particulas de Contaminantes (10 Micrones)</td>
+			<td>PM10</td>
+			<td><a href="{% static "normas/nom-025-ssa1-2014.pdf" %}" target="_blank"><i class="fa fa-file-pdf-o"></i></a> NOM-025-SSAI-2014</td>
+		    </tr>
+		    <tr>
+			<td>Particulas de Contaminantes (2.5 Micrones)</td>
+			<td>PM2.5</td>
+			<td><a href="{% static "normas/nom-025-ssa1-2014.pdf" %}" target="_blank"><i class="fa fa-file-pdf-o"></i></a> NOM-025-SSAI-2014</td>
+		    </tr>
+		</tbody>
+	    </table>
+	</div>
+    </div>
+{% endblock %}
+{% block customjs %}    
+{% endblock %}

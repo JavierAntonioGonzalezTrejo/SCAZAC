@@ -1,0 +1,47 @@
+{% extends "f1.djhtml" %}
+{% load staticfiles%}
+<!-- Modification Register -->
+<!-- Created 20170812 -->
+{% block customcss %}
+
+{% endblock %}
+{% block title %}SCAZAC: Datos IMECA{% endblock %}
+{% block middleprogram %}
+    <div id="containerDescription" class = "row" align="center">
+	<div class="col-md-12 center-block">
+	    
+	    <button data-toggle="collapse" data-target="#info" class="btn">Seleccione los datos de la estación que desea descargar.</button>
+	    <div id="info" class="collapse">
+		Estación: Indica de que estación desea descargar los datos.
+		Los IMECAS mostrados seran promedios representando de cada hora entre el rango seleccionado de fechas.
+	    </div>
+	</div>
+    </div>
+    <div id="containerDescription" class = "row" align="center">
+	<div class="col-md-12 center-block">
+	    <table class="table table-striped">
+		<thead>
+		    <tr>
+			<th>Estación</th>
+			<th>Primer Dia Monitoreado</th>
+			<th>Ultimo Dia Monitoreado</th>
+			<th>Link de Descarga</th>
+		    </tr>
+		</thead>
+		<tbody>
+		    {% for station in station_list %}
+			<tr>
+			    <td>{{ station.nameMonitoringPlace  }}</td>
+			    <td>{{ station.dateOldestRegister }}</td>
+			    <td>{{ station.dateNewestRegister }}</td>
+			    <td><a href="{% url 'calidadAire:DescargaIMECA' station.serialNumber %}" target="_blank"><i class="fa fa-download"></i></a>Descargar</td>
+			</tr>
+		    {% endfor %}
+		</tbody>
+	    </table>
+	</div>
+    </div>
+{% endblock %}
+{% block customjs %}
+
+{% endblock %}

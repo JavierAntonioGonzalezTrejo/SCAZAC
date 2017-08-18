@@ -1,0 +1,133 @@
+{% load staticfiles%} <!-- 20170723: Load the static tag -->
+<!-- Modification Register -->
+<!-- Modification 20170727: Added to all URL reversed the corresponding namespace -->
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css">
+    <link rel="stylesheet" href="https://pingendo.github.io/templates/blank/theme.css" type="text/css">
+    {% block customcss %}<!-- Add Custom CSS to the Template -->
+	<link rel="stylesheet" type="text/css" href="{% static "css/f1_1.css" %}"> </head> <!-- f1.1css -->
+    {% endblock %}
+    <title>{% block title %}Sistema de Calidad del Aire del Estado de Zacatecas{% endblock %}</title> <!-- Added 20170723 -->          
+    <body>
+	<nav class="navbar navbar-expand-md bg-primary text-right navbar-inverse">
+	    <div class="container">
+		<a class="navbar-brand" href="http://www2.uaz.edu.mx/">Universidad Autonoma de Zacatecas</a><!-- Added URL 20170723 , Modified: 20170802 Removed SAMA Brand-->
+		<button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbar2SupportedContent" aria-controls="navbar2SupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+		    <span class="navbar-toggler-icon"></span> </button>
+		<div class="collapse navbar-collapse text-center justify-content-end" id="navbar2SupportedContent">
+		    <ul class="navbar-nav">
+			<li class="nav-item active text-center">
+			    <a class="nav-link text-right" href="#">SIGN IN</a>
+			</li>
+		    </ul>
+		</div>
+	    </div>
+	</nav>
+	<div class="py-5">
+	    <div class="container">
+		<div class="row">
+		    <div class="col-md-2">
+			<div class="row">
+			    <div class="col-md-12">
+				<img class="img-fluid d-block"  src="{% static "img/uazlogo.png" %}"> </div><!-- Modified 20170802. Removed SAMA logo for UAZ logo -->
+			</div>
+			<div class="row">
+			    <div class="col-md-12">
+				<ul class="nav nav-pills flex-column">
+				    <li class="nav-item">
+					<a href="#" class="active nav-link"><i class="fa fa-home fa-home text-white">Navegación</i></a>
+				    </li>
+				    <li class="nav-item">
+					<a href="{% url 'calidadAire:PaginaPrincipal' %}" class="nav-link">Mapa Imeca</a><!-- Added URL 20170723 -->
+				    </li>
+				    <li class="nav-item">
+					<a class="nav-link" href="{% url 'calidadAire:DatosIMECA' %}">Datos</a><!-- Added URL 20170723 -->
+				    </li>
+				    <li class="nav-item">
+					<a class="nav-link" href="{% url 'calidadAire:ReportesAnuales' %}">Reportes</a><!-- Added URL 20170808 -->
+				    </li>
+				    <li class="nav-item">
+					<a class="nav-link" href="{% url 'calidadAire:Normatividad' %}">Normas</a>
+				    </li>
+				    <li class="nav-item">
+					<a class="nav-link" href="{% url 'calidadAire:Infrestructura' %}">Infrestructura</a>
+				    </li>
+				    <li class="nav-item">
+					<a class="nav-link" href="{% url 'calidadAire:DescargaIMECAWA'  %}">Descarga de Datos</a>
+				    </li>
+				</ul>
+			    </div>
+			</div>
+		    </div>
+		    <div class="col-md-10">
+			{% block  middleprogram %}<!-- Modified 20170724: Modified to match the template form the Pigendo App -->
+			    <div class="row">
+				<div id="map" class="col-md-8">
+				    <!-- <div id="map"> </div> --></div>
+				<div class="col-md-4">
+				    <div class="row">
+					<div class="col-md-12">
+					    <div class="card">
+						<div class="card-block">
+						    <h4 id="descAir" class="card-title">Calidad del aire:&nbsp;</h4>
+						</div>
+						<p id="pollant" class="">En Mantenimineto</p><!-- Modified 20170728: If there is not anydata to show, it shows the Message "En mantenimiento" -->
+						<p id="imeca" class=""></p>
+						<p id="place" class=""></p>
+						<p id="registerDate" class=""></p>
+					    </div>
+					</div>
+				    </div>
+				    <div class="row">
+					<div class="col-md-12">
+					    <p class="lead text-center">Descripción de Colores
+						<br> </p>
+					</div>
+				    </div>
+				    <div class="row">
+					<div class="col-md-12">
+					    <ul class="list-group">
+						<!-- Toda esta seccion pertenece al requerimento funcional F1-1-04 -->
+						<li id="good" class="list-group-item" data-toggle="collapse" data-target="#goodDesc">Buena</li>
+						<!-- Modificado el 20170705 -->
+						<div id="goodDesc" class="collapse">Adecuada para llevar a cabo actividades al aire libre.</div>
+						<li id="regular" class="list-group-item" data-toggle="collapse" data-target="#regularDesc">Regular</li>
+						<div id="regularDesc" class="collapse">Se pueden llevar a cabo actividades al aire libre.</div>
+						<li id="bad" class="list-group-item" data-toggle="collapse" data-target="#badDesc">Mala</li>
+						<div id="badDesc" class="collapse">Evite las actividades al aire libre, esté atento a la información de calidad del aire. "Acuda al médico si presenta síntomas respiratorios o cardiacos"</div>
+						<li id="veryBad" class="list-group-item" data-toggle="collapse" data-target="#veryBadDesc">Muy Mala</li>
+						<div id="veryBadDesc" class="collapse">Evite salir de casa y mantenga las ventanas cerradas, esté atento a la información de la calidad del aire. "Acuda al médico si presenta síntomas respiratorios cardiacos"</div>
+						<li id="xbad" class="list-group-item" data-toggle="collapse"
+						    data-target="#xbadDesc">Extremadamente Mala</li>
+						<div id="xbadDesc" class="collapse">Proteja su salud, evite salir de casa y mantenga las ventanas cerradas, esté atento a la información de la calidad del aire. "Acuda al médico si presenta síntomas respiratorios cardiacos". "No use el automóvil"</div>
+					    </ul>
+					</div>
+				    </div>
+				</div>
+			    </div>
+			{% endblock %}
+		    </div>
+		</div>
+	    </div>
+	    <script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+	    <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js"></script>
+	    <script src="https://pingendo.com/assets/bootstrap/bootstrap-4.0.0-alpha.6.min.js"></script>
+	    {% block customjs %}<!-- Add custom js to the emplate -->
+		<script src="{%static "js/f1_1.js" %}"></script> <!-- f1_1.js -->
+		<script async="" defer="" src="https://maps.googleapis.com/maps/api/js?key={{ keyGoogleMap|safe }};callback=initMap"> <!-- The server side will provide a key to use on the map  -->
+		</script>
+		<script>
+		 var ampliacion = {{ zoom|safe }}; <!-- Modified 20170722 This script will be seted by the server side -->
+		 var station = {{ pollantData|safe }};
+		 var centerMapLat = {{ centerMapLat|safe }}; <!-- Modification 20170723: Center an zoom will be managed from the server side -->
+		 var centerMapLng = {{ centerMapLng|safe }};
+		</script>
+	    {% endblock %}
+	</div>
+    </body>
+    
+</html>

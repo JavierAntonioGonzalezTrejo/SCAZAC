@@ -2,6 +2,7 @@
 # Register of Change:
 # Modified 20170721: Adde the function index. Left the query to retrive the information of the data 
 # Modified 20170723: Information about the map zoom, google API key and position will be given to using a model
+# Modified 20170828: Bug Eliminated: The Query shows all the Monitoring Station data on one single Monitoring Station Table on the Template. Eliminated get function redundant code aun fully utilized the showImeca function on all the cases for the f1_2 requirment.
 from __future__ import unicode_literals
 from django.shortcuts import render
 from investigacion.models import MonitoringStation, MonitoringData
@@ -41,8 +42,8 @@ def index(request):             # Rewritted 20170730: Replaced the Old for loop 
         for imeca in imecas:
             monitoringInfo[str(monitor.serialNumber)]['pollantImeca'].append(imeca)
 
-        # The information of the Map will be unique, so is safe to use the pk 1
-        mapInformation = MonitoringMap.objects.get(pk=1)
+    # The information of the Map will be unique, so is safe to use the pk 1
+    mapInformation = MonitoringMap.objects.get(pk=1)
 
     return render(request, "f1.djhtml", {
         "pollantData": json.dumps(monitoringInfo),
@@ -56,7 +57,6 @@ class ImecaData(TemplateView):  # Added 20170730
     year_list = []
     station_list = {}
     tableStation_list = {}
-    imecaData_list = []
     tableType = 1
     model = MonitoringStation   # Model of the Station
     dataModel = MonitoringData  # Model of Data
@@ -73,7 +73,6 @@ class ImecaData(TemplateView):  # Added 20170730
         self.year_list = []
         self.station_list = {}
         self.tableStation_list = {}
-        self.imecaData_list = []
         # First get the Year list, the year list will contain the oldest year of all the monitoring station to the current year
         self.year_list.append(int(self.monitoringStations.order_by('dateOldestRegister')[0].dateOldestRegister.year))
         # Obtian the diference in years between the oldest year and the current year
@@ -98,6 +97,7 @@ class ImecaData(TemplateView):  # Added 20170730
             
             if request.GET['range'] == "1":
                 self.dateShowed = request.GET['year'] + "-" + request.GET['month'] + "-" +  request.GET['day'] + " "
+                return self.showImeca(request, ImecaDataHour)
                 
             elif request.GET['range'] == "2":
                 self.dateShowed = request.GET['year'] + "-" + request.GET['month'] + "-"
@@ -112,56 +112,9 @@ class ImecaData(TemplateView):  # Added 20170730
                 self.rangeTimeSpan = range(1, self.numberData2Show)
                 self.tableType = 3
                 return self.showImeca(request, ImecaDataMonth)
-        #Index used the utilize the respective list for each station on the tableStation_list
-        indexStation = 0
-    
-    
-        for station in self.monitoringStations:
-            self.tableStation_list[station.nameMonitoringPlace] = self.dateShowed
 
-           # Append the list for each station
-            self.imecaData_list.append([])
-
-           # Index indicating the list of the corresponding time span, example, the list for all the values on. The reason to no use numberData is beacause is posible that a dayy migth not exist and the following does, so the index must stay the same
-            indexTimeSpan = 0
-            
-            # Pass throw the hours, days and months in the type table as day, month, year
-            for numberData in self.rangeTimeSpan:
-                # Get the Data of the respective range of time depending on the type of table
-                imecaData = MonitoringData.objects.filter(idStation__pk=station.serialNumber).filter(fecha__icontains=str(self.dateShowed) + self.number2ZeroBeforeDigit(numberData)) # Added 20170808 Added the filter of the monitor
-                sizeData = len(imecaData)
-
-                # If is no data on the respective search thrwo the imecas on each hour, day or month, continue whit the next the hour, day, month
-                
-                try:
-                    # Create a new list inside the list of this station (The current station) to hold the imecas   
-                    self.imecaData_list[indexStation].append([])
-                
-                    # Calculate the mean of each contaminant
-                    imecas = imecaMean(imecaData, sizeData)
-
-
-                    # Append first the description of the time span and then the mecas on the order describen on the model MonitoringData or on the template f1_2.djhtml
-                    self.imecaData_list[indexStation][indexTimeSpan].append(self.stringTimeSpan(self.tableType,numberData))
-                    for imeca in imecas:
-                        if not(imeca == None):
-                            self.imecaData_list[indexStation][indexTimeSpan].append(imeca)
-                        else:
-                            self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
-                        
-                except:
-                    continue
-                # Continue whit the next time span
-                indexTimeSpan += 1
-            # Continue whit the next Station
-            indexStation += 1
-
-        return render(request, "calidadAire/f1_2.djhtml", 
-                  {'year_list': self.year_list,
-                   'station_list': self.station_list,
-                   'tableStation_list': self.tableStation_list,
-                   'imecaData_list': self.imecaData_list,
-                   'tableType': self.tableType})
+        return self.showImeca(request, ImecaDataHour)
+        
 
     def showImeca(self, request, modelImeca):
         """Function utilized to extract the IMECA values from the respective Model and not calculate the IMECA mean on the fly """
@@ -170,10 +123,10 @@ class ImecaData(TemplateView):  # Added 20170730
     
     
         for station in self.monitoringStations:
-            self.tableStation_list[station.nameMonitoringPlace] = self.dateShowed
+            self.tableStation_list[station.nameMonitoringPlace] = [self.dateShowed]
 
-           # Append the list for each station
-            self.imecaData_list.append([])
+           # Append the list for each station on the dictionary
+            self.tableStation_list[station.nameMonitoringPlace].append([])
 
            # Index indicating the list of the corresponding time span, example, the list for all the values on. The reason to no use numberData is beacause is posible that a dayy migth not exist and the following does, so the index must stay the same
             indexTimeSpan = 0
@@ -186,59 +139,58 @@ class ImecaData(TemplateView):  # Added 20170730
                 try:
                     
                     # Create a new list inside the list of this station (The current station) to hold the imecas   
-                    self.imecaData_list[indexStation].append([])
+                    self.tableStation_list[station.nameMonitoringPlace][1].append([])
                     
-                    self.imecaData_list[indexStation][indexTimeSpan].append(self.stringTimeSpan(self.tableType,numberData))
+                    self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(self.stringTimeSpan(self.tableType,numberData))
 
                     if imecaData[0].imecaO3 == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaO3)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaO3)
 
                     if imecaData[0].imecaNO == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaNO)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaNO)
 
                     if imecaData[0].imecaNO2 == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaNO2)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaNO2)
 
                     if imecaData[0].imecaNOX == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaNOX)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaNOX)
 
                     if imecaData[0].imecaSO2 == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaSO2)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaSO2)
 
                     if imecaData[0].imecaCO == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaCO)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaCO)
 
                     if imecaData[0].imecaPM10 == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaPM10)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaPM10)
 
                     if imecaData[0].imecaPM25 == None:
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                     else:
-                        self.imecaData_list[indexStation][indexTimeSpan].append(imecaData[0].imecaPM25)
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append(imecaData[0].imecaPM25)
                 except:
                     for i in range(0,8):
-                        self.imecaData_list[indexStation][indexTimeSpan].append("Inexistente.")
+                        self.tableStation_list[station.nameMonitoringPlace][1][indexTimeSpan].append("Inexistente.")
                 indexTimeSpan += 1
-            indexStation += 1
+
         return render(request, "calidadAire/f1_2.djhtml", 
                       {'year_list': self.year_list,
                        'station_list': self.station_list,
                        'tableStation_list': self.tableStation_list,
-                       'imecaData_list': self.imecaData_list,
                        'tableType': self.tableType})
 
     def number2ZeroBeforeDigit(self,number):

@@ -3,6 +3,7 @@
 <!-- Modification Register -->
 <!-- Modification 20170717: Added the table range data selector whit some format added depending type of data range, year and month -->
 <!-- Modification 20170727 Removed the crs token becouse is innesesary on the context of GET request. Added an "All" option on the monitoring  station action button-->
+<!-- Modification 20170828 Eliminated Variable imecaData_list which caused a bug that showed all the monitoring Imeca Data on one single monitoring table -->
 
 <!-- Variables used for Django -->
 <!-- year_list The list of years saved on the system database -->
@@ -10,13 +11,13 @@
      The variable is an dictionary in this format {idStation: monitoringPlace, idStation2: monitoringPlace2, ..}-->
 <!-- tableStation_list: Dictionary containing the following variables in this format {imecaStation: imecaDate, imecaStation2: imecaDate2, ..} -->
 <!-- imecaStation: Contains the name of the place which the station monitors -->
-<!-- imecaDate: Contains a string describing the Range which the table is displaying.
+<!-- imecaDate: Contains a list which first argument is a string describing the Range which the table is displaying and for second argument contains the list of the IMECA data.
      Example: Dia 22/Enero/2015
      Mes Enero/2015
      Año 2015-->
+<!-- imecaDate (Continuation): Variable containing a list of list whit IMECAS corresponding to certain time span. The first element of each list i the time span that it cover, will be hours, days or months; next the imecas Values in this corresponding order:
+     "Ozono", "Óxido de Nitrógeno", "Dióxido de Nitrógeno", "NOx", "Dióxido de Azufre", "Óxido de Carbono", "Particulas Contaminantes (10 Micrones)", "Particulas Contaminantes (2.5 Micrones)". As for first argument contains the date of the monitoring data--><!-- Modified 20170828 -->
 <!-- End Description tableStation_list -->
-<!-- imecaData_list: Variable containing a list of list whit IMECAS corresponding to certain time span. The first element of each list i the time span that it cover, will be hours, days or months; next the imecas Values in this corresponding order:
-     "Ozono", "Óxido de Nitrógeno", "Dióxido de Nitrógeno", "NOx", "Dióxido de Azufre", "Óxido de Carbono", "Particulas Contaminantes (10 Micrones)", "Particulas Contaminantes (2.5 Micrones)"-->
 <!-- tableType: Variable containing the type of table it is, 1 for 'Dia', 2 for 'Mes' and 3 for 'Año' -->
 {% block customcss %}
     <link rel="stylesheet" type="text/css" href="{% static "css/f1_2.css" %}">
@@ -111,55 +112,54 @@
 	    </form>
 	</div>
     </div>
-    {% for imecaStation, imecaDate in tableStation_list.iteritems %}
+    {% for imecaStation, imecaDateList in tableStation_list.iteritems %}
 	
 	<div class="row containerDescription" align="center">
 	    <div class="col-md-12 center-block">
-		Tabla IMECA Estación:{{ imecaStation }}, {{ imecaDate }}
+		Tabla IMECA Estación:{{ imecaStation }}, {{ imecaDateList.0 }}
 	    </div>
 	</div>
 	<div class="row" align="center">
 	    <div class="col-md-12 center-block">
-		{% for imecaData in imecaData_list %}
-		    <div class="table-responsive">
-			<table class="table-bordered">
-			    <thead>
+		
+		<div class="table-responsive">
+		    <table class="table-bordered">
+			<thead>
+			    <tr>
+				{% if tableType == 1 %}
+				    <th>Hora</th>
+				{% elif tableType == 2 %}
+				    <th>Dia</th>
+				{% else %}
+				    <th>Mes</th>
+				{% endif %}
+				<th>Ozono</th>
+				<th>Óxido de Nitrógeno</th>
+				<th>Dióxido de Nitrógeno</th><!-- Added 20170728: Missing attribute -->
+				<th>NOx</th>
+				<th>Dióxido de Azufre</th>
+				<th>Óxido de Carbono</th>
+				<th>Particulas de Contaminantes (10 Micrones)</th>
+				<th>Particulas de Contaminantes (2.5 Micrones)</th>
+			    </tr>
+			</thead>
+			<tbody>
+			    {% for imeca in imecaDateList.1 %}
 				<tr>
-				    {% if tableType == 1 %}
-					<th>Hora</th>
-				    {% elif tableType == 2 %}
-					<th>Dia</th>
-				    {% else %}
-					<th>Mes</th>
-				    {% endif %}
-				    <th>Ozono</th>
-				    <th>Óxido de Nitrógeno</th>
-				    <th>Dióxido de Nitrógeno</th><!-- Added 20170728: Missing attribute -->
-				    <th>NOx</th>
-				    <th>Dióxido de Azufre</th>
-				    <th>Óxido de Carbono</th>
-				    <th>Particulas de Contaminantes (10 Micrones)</th>
-				    <th>Particulas de Contaminantes (2.5 Micrones)</th>
+				    <td class="imeca-data" >{{ imeca.0 }}&zwnj;</td><!-- The class imeca-data will be uses to select the color of each td element Modified 20170807: Insert invisible character in order to maintain the white color-->
+				    <td class="imeca-data" >{{ imeca.1 }}</td>
+				    <td class="imeca-data" >{{ imeca.2 }}</td>
+				    <td class="imeca-data" >{{ imeca.3 }}</td>
+				    <td class="imeca-data" >{{ imeca.4 }}</td>
+				    <td class="imeca-data" >{{ imeca.5 }}</td>
+				    <td class="imeca-data" >{{ imeca.6 }}</td>
+				    <td class="imeca-data" >{{ imeca.7 }}</td>
+				    <td class="imeca-data" >{{ imeca.8 }}</td>
 				</tr>
-			    </thead>
-			    <tbody>
-				{% for imeca in imecaData %}
-				    <tr>
-					<td class="imeca-data" >{{ imeca.0 }}&zwnj;</td><!-- The class imeca-data will be uses to select the color of each td element Modified 20170807: Insert invisible character in order to maintain the white color-->
-					<td class="imeca-data" >{{ imeca.1 }}</td>
-					<td class="imeca-data" >{{ imeca.2 }}</td>
-					<td class="imeca-data" >{{ imeca.3 }}</td>
-					<td class="imeca-data" >{{ imeca.4 }}</td>
-					<td class="imeca-data" >{{ imeca.5 }}</td>
-					<td class="imeca-data" >{{ imeca.6 }}</td>
-					<td class="imeca-data" >{{ imeca.7 }}</td>
-					<td class="imeca-data" >{{ imeca.8 }}</td>
-				    </tr>
-				{% endfor %}
-			    </tbody>
-			</table>
-		    </div> 
-		{% endfor %}
+			    {% endfor %}
+			</tbody>
+		    </table>
+		</div> 
 	    </div>
 	</div>
     {% endfor %}

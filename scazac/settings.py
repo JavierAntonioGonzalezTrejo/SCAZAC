@@ -1,4 +1,5 @@
-# Modified" 20170807: Usage of Naive DateTimes USE_TZ
+# Modified 20170807: Usage of Naive DateTimes USE_TZ
+# Modified 20170910
 import os
 
 
@@ -28,7 +29,7 @@ TIME_ZONE = "America/Mexico_City"               # MX
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "es-MX"         # Modified 20170910
 
 SITE_ID = int(os.environ.get("SITE_ID", 1))
 
@@ -176,11 +177,12 @@ FIXTURE_DIRS = [
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-ACCOUNT_OPEN_SIGNUP = True
+# Settings for account 
+ACCOUNT_OPEN_SIGNUP = False
 ACCOUNT_EMAIL_UNIQUE = True
 ACCOUNT_EMAIL_CONFIRMATION_REQUIRED = False
 ACCOUNT_LOGIN_REDIRECT_URL = "home"
-ACCOUNT_LOGOUT_REDIRECT_URL = "home"
+ACCOUNT_LOGOUT_REDIRECT_URL = "home" # Not needed because the Signup form will be not activated 
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 2
 ACCOUNT_USE_AUTH_AUTHENTICATE = True
 

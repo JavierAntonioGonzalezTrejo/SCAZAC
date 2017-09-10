@@ -21,7 +21,7 @@
 		<div class="collapse navbar-collapse text-center justify-content-end" id="navbar2SupportedContent">
 		    <ul class="navbar-nav">
 			<li class="nav-item active text-center">
-			    <a class="nav-link text-right" href="#">SIGN IN</a>
+			    <a class="nav-link text-right" href="{% url  "account_login" %}">Identificarse</a><!-- Modified 20170910: Añadido el apartado de login al sistema -->
 			</li>
 		    </ul>
 		</div>

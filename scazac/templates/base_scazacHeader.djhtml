@@ -1,0 +1,28 @@
+{% extends "theme_bootstrap/base.html" %}<!-- Created 20170910: Change the color of the Nav bar -->
+{% block topbar_base %}
+    <header>
+        <div class="navbar navbar-default scazacBar {% block navbar_class %}navbar-fixed-top{% endblock %}"><!-- Changed 20170910: Added the scazacBar to change the color of the superior bar-->
+            <div class="container">
+                {% block topbar %}
+                    <div class="navbar-header">
+                        <button class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                            <span class="fa fa-bars"></span>
+                        </button>
+                        {% block site_brand %}<a style="color: #FFFFFF;" class="navbar-brand" href="{% url "home" %}">{{ SITE_NAME }}</a>{% endblock %}<!-- Changed 20170910: The color of this space is setted to white -->
+                    </div>
+                    <div class="collapse navbar-collapse navbar-responsive-collapse">
+                        {% block nav %}
+                            {% comment %}
+                            <ul class="nav navbar-nav">
+                            <li><a href="#tab_one">One</a></li>
+                            <li><a href="#tab_two">Two</a></li>
+                            </ul>
+                            {% endcomment %}
+                        {% endblock %}
+                        {% block account_bar %}{% include "_account_bar.html" %}{% endblock %}
+                    </div>
+                {% endblock %}
+            </div>
+        </div>
+    </header>
+{% endblock %}

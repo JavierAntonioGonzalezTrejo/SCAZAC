@@ -7,6 +7,12 @@
         <p style="color: white;" class="navbar-text">
             <i style="color: white;" class="fa fa-user"></i> {% user_display request.user %}
         </p>
+  <li>
+    <a style="color: white;" href="#"><i class="fa fa-bar-chart-o"></i>Graficas</a>
+  </li>
+  <li>
+    <a style="color: white;" href="#"><i class="fa fa-file-text"></i>Generar Reporte</a>
+  </li>
         <li>
             <a style="color: white;" href="{% url 'account_settings' %}"><i class="fa fa-cog"></i> {% trans "Settings" %}</a>
         </li>

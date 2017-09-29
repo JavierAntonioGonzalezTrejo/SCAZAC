@@ -2,7 +2,6 @@
 <!-- Modification Register -->
 <!-- Modification 20170727: Added to all URL reversed the corresponding namespace -->
 <html>
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -129,5 +128,4 @@
 	    {% endblock %}
 	</div>
     </body>
-    
 </html>

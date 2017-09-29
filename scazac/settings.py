@@ -1,7 +1,11 @@
 # Modified 20170807: Usage of Naive DateTimes USE_TZ
 # Modified 20170910
+# Modified 20170925 Set encoding for the proyect to UTF8
 import os
+import sys                      
 
+reload(sys)                     # Added 20170925
+sys.setdefaultencoding('utf8')  # 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 PACKAGE_ROOT = os.path.abspath(os.path.dirname(__file__))
@@ -181,8 +185,8 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 ACCOUNT_OPEN_SIGNUP = False
 ACCOUNT_EMAIL_UNIQUE = True
 ACCOUNT_EMAIL_CONFIRMATION_REQUIRED = False
-ACCOUNT_LOGIN_REDIRECT_URL = "home"
-ACCOUNT_LOGOUT_REDIRECT_URL = "home" # Not needed because the Signup form will be not activated 
+ACCOUNT_LOGIN_REDIRECT_URL = "investigacion:principal"
+ACCOUNT_LOGOUT_REDIRECT_URL = "home"
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 2
 ACCOUNT_USE_AUTH_AUTHENTICATE = True
 

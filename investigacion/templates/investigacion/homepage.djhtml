@@ -1,0 +1,75 @@
+{% extends "site_base.html" %}
+<!-- Created 20170924 -->
+<!-- Modified 20170927 -->
+{% load i18n %}
+{% block styles %}
+    {% include "_styles.html" %}
+    <style>
+     .bk-root{
+	 z-index:1;
+     }
+    </style>
+{% endblock %}
+{% block head_title %}Reportes Estadisticos{% endblock %}
+
+{% block body_class %}investigacion-principal{% endblock %}
+{% block body_base %}
+    <div class="container">
+	<div class="row">
+	    <div class="col-md-4">
+		<form action="{% url 'investigacion:principal' %}" method="post"> {% csrf_token %}<!-- Form added 20170925 -->
+		    <fieldset><!-- The form is created on this way to use boostrap which django has not by standar -->
+			<legend>Opciones para Graficar</legend>
+			{% for field in graphForm %}
+			    {% if field.errors %}
+				<div class="form-group error">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					<span class="help-inline">
+					    {% for error in  field.errors %}{{ error }}{% endfor %}
+					</span>
+				    </div>
+				</div>
+			    {% else %}
+				<div class="form-group">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					{% if field.help_text %}
+					    <p class="help-inline"><small>{{ field.help_text }}</small></p>
+					{% endif %}
+				    </div>
+				</div>
+			    {% endif %}
+			{% endfor %}
+		    </fieldset>
+		    <div class="form-actions form-group">
+			<button type="submit" method="post" class="btn btn-primary" >Graficar</button>
+		    </div>
+		    <!-- 20170928 Eliminated second button. Option to save now added on the form. -->
+		</form>
+	    </div>
+	    <div class="col-md-8">
+		{{ the_div|safe }}
+		
+		{{ the_script|safe }}
+		<div class="row">
+		    <h3>Datos estadisticos (Para el elemento Y)</h3>
+		    <ul class="list-group">
+			<li class="list-group-item">Media: {{ mean }}</li>
+			<li class="list-group-item">Mediana: {{ median }}</li>
+			<li class="list-group-item">Desviación Estandar:{{ std  }} </li>
+			<li class="list-group-item">Varianza: {{ var }}</li>
+			<li class="list-group-item">Coeficiente de Correlación: {{ corrcoef }}</li>
+			<li class="list-group-item">Valor Máximo: {{ max }}</li>
+			<li class="list-group-item">Valor Minimo: {{ min }}</li>
+		    </ul> 
+		</div>
+	    </div>
+	</div>
+    </div>
+    <!-- Scripts taken of another webgl Bokeh graph to use webgl capabilities -->
+    <link rel="stylesheet" href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.9.min.css" type="text/css" />
+    
+    <script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.9.min.js"></script>
+    <script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-gl-0.12.9.min.js"></script>
+{% endblock %}

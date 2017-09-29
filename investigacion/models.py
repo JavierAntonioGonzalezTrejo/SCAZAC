@@ -1,4 +1,5 @@
-# -*- codoing: utf-8 -*-
+#!/usr/bin/python
+# -*- coding: utf-8 -*-         
 # All Decimal Field will have 0.00000 this format.
 # Register of Modifications:
 # Modificated 20170713: Eliminated all methods to obtain IMECAS, will be remplaced whit static decimal values
@@ -6,11 +7,13 @@
 # Modificated 20170721: Detected bug on the fecha field. It must be a DateTimeField in order to accept hours and minutes
 # Modificates 20170722: Bug corrected on str for MonitoringData, now aoutputs an str using the DateTimeFild
 # Modificated 20170807: On MonitoringData fecha no longer serves as the primary key (New primary key: id), make the combination of idStation and fecha unique for each register.
+# Modificated 20170926: GraphsRecord modified; Identify user and save generated graph.
+# Modificated 20170927: Calculat statistics values once.
 from __future__ import unicode_literals
 from django.utils.encoding import python_2_unicode_compatible
 import math
-
 from django.db import models
+from django.conf import settings
 
 class MonitoringStation(models.Model):
     """Model which will hold General information about the Monitoring Stations"""
@@ -68,3 +71,87 @@ class MonitoringData(models.Model):
         """Class to hold constraints of the database, espesificaly to enforce the rule of the unique convination of fecha and idStation: Have a unique date register per monitoring station"""
         unique_together = ("idStation", "fecha")
         
+class GraphsRecord(models.Model): # Added 20170925
+    """Needed to save User Graph Options to graph on another session or to create a report based on a specified selection"""
+    CORRELACIONAL_GRAPH_TYPE = 1
+    REGRESION_GRAPH_TYPE = 2
+    GRAPH_TYPE_CHOICES = (
+        (CORRELACIONAL_GRAPH_TYPE, 'Correlación'),
+        (REGRESION_GRAPH_TYPE, 'Regreción'),
+    )
+
+    FECHA_AIRMEASURE = 0
+    O3_AIRMEASURE = 1
+    CO_AIRMEASURE = 2
+    NO_AIRMEASURE = 3
+    NO2_AIRMEASURE = 4
+    NOX_AIRMEASURE = 5
+    SO2_AIRMEASURE = 6
+    TEMPAMB_AIRMEASURE = 7
+    HUMEDAD_AIRMEASURE = 8
+    WS_AIRMEASURE = 9
+    WD_AIRMEASURE = 10
+    PRESBARO_AIRMEASURE = 11
+    RADSOLAR_AIRMEASURE = 12
+    PRECIPITACION_AIRMEASURE = 13
+    PM10_AIRMEASURE = 14
+    PM25_AIRMEASURE = 15
+
+    AIRMEASURE_CHOICES = (
+        (FECHA_AIRMEASURE, "Fecha"),
+        (O3_AIRMEASURE, "O3 (ppm)"),
+        (CO_AIRMEASURE, "CO (ppm)"),
+        (NO_AIRMEASURE, "NO (ppm)"),
+        (NO2_AIRMEASURE, "NO2 (ppm)"),
+        (NOX_AIRMEASURE, "NOx (ppm)"),
+        (SO2_AIRMEASURE, "SO2 (ppm)"),
+        (TEMPAMB_AIRMEASURE, "Temperatura Ambiente (Centigrados)"),
+        (HUMEDAD_AIRMEASURE, "Humedad Relativa (%)"),
+        (WS_AIRMEASURE, "WS"),
+        (WD_AIRMEASURE, "WD"),
+        (PRESBARO_AIRMEASURE, "Presión Barometrica (N/m²)"),
+        (RADSOLAR_AIRMEASURE, "Radiación Solar (W/m²)"),
+        (PRECIPITACION_AIRMEASURE, "Precipitación (mm)"),
+        (PM10_AIRMEASURE, "Particulate Matter 10 microns (µg/m³)"),
+        (PM25_AIRMEASURE, "Particulate Matter 2.5 microns (µg/m³)"),
+    )
+
+    LINE_GLYPH_TYPE = 1
+    POINT_GLYPH_TYPE = 2
+
+    GLYPH_TYPE_CHOICES = (
+        (LINE_GLYPH_TYPE, "Linea"),
+        (POINT_GLYPH_TYPE, "Punto"),
+    )
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE) # Added 20170926 Identify which user made the Graph
+    name = models.CharField(null=True, max_length=80)
+    date = models.DateTimeField()
+    graph_type = models.IntegerField(choices=GRAPH_TYPE_CHOICES, default=CORRELACIONAL_GRAPH_TYPE)
+    airMeasureY = models.IntegerField(choices=AIRMEASURE_CHOICES, default=FECHA_AIRMEASURE)
+    airMeasureX = models.IntegerField(choices=AIRMEASURE_CHOICES, default=FECHA_AIRMEASURE)
+    initialDate = models.DateField()
+    finalDate = models.DateField()
+    monitoringStation = models.ForeignKey(
+        'MonitoringStation',
+        on_delete=models.CASCADE,
+    )
+    glyph_type = models.IntegerField(choices=GLYPH_TYPE_CHOICES, default=LINE_GLYPH_TYPE)
+    #fill_dates = models.BooleanField(default=False) Removed 20170928
+    eliminate_error_sampling = models.BooleanField(default=False)
+    script = models.TextField() # Added 20170926 Render the graph once
+    div = models.TextField()    #
+    
+    mean = models.FloatField()  # Added 20170927: Calculate this values once.
+    median = models.FloatField()
+    std = models.FloatField()
+    vari = models.FloatField()
+    corrcoef = models.FloatField()
+    maxValue = models.FloatField()
+    minValue = models.FloatField()
+    
+    def __str__(self):
+        """Function to represent the model"""
+        if self.name is None:
+            return str(self.date)
+        else:
+            return str(self.name)

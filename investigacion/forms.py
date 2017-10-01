@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# Modified 20171001: For initialdate and finalDate, only on type of date will be accepted to reduce complexity converting to type date
 from django import forms
 from django.core.exceptions import ValidationError
 from investigacion.models import GraphsRecord, MonitoringStation
@@ -9,8 +10,8 @@ class GraphsForm(forms.Form):
     graph_type = forms.ChoiceField(label="Tipo de Gráfica", choices=GraphsRecord.GRAPH_TYPE_CHOICES,  help_text="Escoga si desea comparar un elemento con otro o realizar un modelo basico de una grafica en particular.")
     airMeasureY = forms.ChoiceField(label="Elemento en Y", choices=GraphsRecord.AIRMEASURE_CHOICES,  help_text="Escoga que elemento estara en el eje de las Y.")
     airMeasureX = forms.ChoiceField(label="Elemento en X", choices=GraphsRecord.AIRMEASURE_CHOICES,  help_text="Escoga que elemento estara en el eje de las X.")
-    initialDate = forms.DateField(label="Fecha del primer registro",help_text="Ingrese una fecha de donde se empieze a recolectar datos para la grafica. (2006-10-25, 10/25/2006, 10/25/06)", error_messages={'required':"Se necesita que ingrese una fecha de inicio!" , 'invalid':"Ingrese una fecha valida!"} )
-    finalDate = forms.DateField(label="Fecha del ultimo registro",help_text="Ingrese una fecha de donde se termine de recolectar datos para la grafica. (2006-10-25, 10/25/2006, 10/25/06)", error_messages={'required':"Se necesita que ingrese una fecha de inicio!" , 'invalid':"Ingrese una fecha valida!"} )
+    initialDate = forms.DateField(label="Fecha del primer registro",help_text="Ingrese una fecha de donde se empieze a recolectar datos para la grafica. (2006-10-25)", error_messages={'required':"Se necesita que ingrese una fecha de inicio!" , 'invalid':"Ingrese una fecha valida!"}, input_formats=['%Y-%m-%d'] ) # Modified 20171001: Only on type of date will be accepted to reduce complexity converting to type date
+    finalDate = forms.DateField(label="Fecha del ultimo registro",help_text="Ingrese una fecha de donde se termine de recolectar datos para la grafica. (2006-10-25)", error_messages={'required':"Se necesita que ingrese una fecha de inicio!" , 'invalid':"Ingrese una fecha valida!"}, input_formats=['%Y-%m-%d']) # Modified 20171001: Only on type of date will be accepted to reduce complexity converting to type date
     monitoringStation = forms.ChoiceField(label="Estación de monitoreo", choices=tuple((station.serialNumber, station.nameMonitoringPlace) for station in MonitoringStation.objects.all()), help_text="Escoga la estación de monitoreo de donde se obtendran los datos.")
     glyph_type = forms.ChoiceField(label="Representación de la Grafica", choices=GraphsRecord.GLYPH_TYPE_CHOICES, help_text="Escoga con que elemento grafico se representaran los datos (Linea o puntos).")
     eliminate_error_sampling = forms.BooleanField(label="¿Mejorar la calidad de los datos?", required=False, help_text="Se elminaran, en lo razonable, posibles errores de muestreo que se tengan en los datos (Aumenta timepo de espera)" )

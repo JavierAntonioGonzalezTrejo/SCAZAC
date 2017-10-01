@@ -148,6 +148,7 @@ class GraphsRecord(models.Model): # Added 20170925
     corrcoef = models.FloatField()
     maxValue = models.FloatField()
     minValue = models.FloatField()
+    std_err = models.FloatField(null=True)
     
     def __str__(self):
         """Function to represent the model"""

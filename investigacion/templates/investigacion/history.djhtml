@@ -1,0 +1,119 @@
+{% extends "site_base.html" %}
+{% load i18n %}
+{% block head_title %}Historial de Graficas{% endblock %}
+
+{% block body_class %}investigacion-historial{% endblock %}
+{% block body_base %}
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.2.1.min.js"></script><!-- The reson to put the script here is to have the $ reference up for the script downbelow -->
+    <div class="container">
+	<div class="row">
+	    <div class="col-md-4">
+		<form action="{% url 'investigacion:historial' %}" method="post"> {% csrf_token %}
+		    <fieldset>
+			<legend>Opciones del Historial</legend>
+			{% for field in historyForm %}
+			    {% if field.errors %}
+				<div class="form-group error">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					<span class="help-inline">
+					    {% for error in  field.errors %}{{ error }}{% endfor %}
+					</span>
+				    </div>
+				</div>
+			    {% else %}
+				<div class="form-group">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					{% if field.help_text %}
+					    <p class="help-inline"><small>{{ field.help_text }}</small></p>
+					{% endif %}
+				    </div>
+				</div>
+			    {% endif %}
+			{% endfor %}
+		    </fieldset>
+		    <div class="form-actions form-group">
+			<button type="submit" method="post" class="btn btn-primary" name="actionHistory" value="1" name="actionHistory">Graficar</button>
+		    </div>
+		    <div class="form-actions form-group">
+			<button type="submit" method="post" class="btn btn-danger" name="actionHistory" value="2">Borrar elementos seleccionados</button>
+		    </div>
+		    <div class="form-actions form-group">
+			<button type="submit" method="post" class="btn btn-info" name="actionHistory" value="3">Buscar Grafica</button>
+		    </div>
+		</form>
+	    </div>
+	    <div class="col-md-8">
+		<h3>Descripción de la Grafica</h3>
+		<ul class="list-group">
+		    <li id="name" class="list-group-item">Nombre: </li>
+		    <li id="date" class="list-group-item">Fecha de consulta: </li>
+		    <li id="graph_type" class="list-group-item">Tipo de Grafica: </li>
+		    <li id="airMeasureY" class="list-group-item">Elemento en Y: </li>
+		    <li id="airMeasureX" class="list-group-item">Elemento en X:</li>
+		    <li id="initialDate" class="list-group-item">Fecha Inicial: </li>
+		    <li id="finalDate" class="list-group-item">Fecha Final: </li>
+		    <li id="monitoringStation" class="list-group-item">Estación de Monitoreo: </li>
+		    <li id="glyph_type" class="list-group-item">¿Linea o punto?: </li>
+		    <li id="eliminate_error_sampling" class="list-group-item">Mejorar error de los datos: </li>
+		    <li id="mean" class="list-group-item">Media: </li>
+		    <li id="median" class="list-group-item">Mediana: </li>
+		    <li id="std" class="list-group-item">Desviación Estandar: </li>
+		    <li id="vari" class="list-group-item">Varianza: </li>
+		    <li id="corrcoef" class="list-group-item">Coeficiente de Correlación: </li>
+		    <li id="maxValue" class="list-group-item">Valor Máximo: </li>
+		    <li id="minValue" class="list-group-item">Valor Minimo: </li>
+		    <li id="std_err" class="list-group-item">Error Estandar: </li>
+		</ul>
+	    </div>
+	</div>
+    </div>
+    <script>
+     var graphsData = {{ descriptionGraphs | safe }};
+    </script>
+    <script>
+     $("#id_graphsUser").change(function(){
+	 var graphID = $("#id_graphsUser").val()[0]
+	 $("#name").text("Nombre: ")
+	 $("#date").text("Fecha de consulta: ");
+	 $("#graph_type").text("Tipo de Grafica: ");
+	 $("#airMeasureY").text("Elemento en Y: ");
+	 $("#airMeasureX").text("Elemento en X: ");
+	 $("#initialDate").text("Fecha Inicial: ");
+	 $("#finalDate").text("Fecha Final: ");
+	 $("#monitoringStation").text("Estación de Monitoreo: ");
+	 $("#glyph_type").text("¿Linea o punto?: ");
+	 $("#eliminate_error_sampling").text("Mejorar error de los datos: ");
+	 $("#mean").text("Media: ");
+	 $("#median").text("Mediana: ");
+	 $("#std").text("Desviación Estandar: ");
+	 $("#vari").text("Varianza: ");
+	 $("#corrcoef").text("Coeficiente de Correlación: ");
+	 $("#maxValue").text("Valor Máximo: ");
+	 $("#minValue").text("Valor Minimo: ");
+	 $("#std_err").text("Error Estandar: ");
+	 $("#name").text($("#name").text() + graphsData[graphID]["name"]);
+	 $("#date").text($("#date").text() + graphsData[graphID]["date"]);
+	 $("#graph_type").text($("#graph_type").text() + graphsData[graphID]["graph_type"]);
+	 $("#airMeasureY").text($("#airMeasureY").text() + graphsData[graphID]["airMeasureY"]);
+	 $("#airMeasureX").text($("#airMeasureX").text() + graphsData[graphID]["airMeasureX"]);
+	 $("#initialDate").text($("#initialDate").text() + graphsData[graphID]["initialDate"]);
+	 $("#finalDate").text($("#finalDate").text() + graphsData[graphID]["finalDate"]);
+	 $("#monitoringStation").text($("#monitoringStation").text() + graphsData[graphID]["monitoringStation"]);
+	 $("#glyph_type").text($("#glyph_type").text() + graphsData[graphID]["glyph_type"]);
+	 $("#eliminate_error_sampling").text($("#eliminate_error_sampling").text() + graphsData[graphID]["eliminate_error_sampling"]);
+	 $("#mean").text($("#mean").text() + graphsData[graphID]["mean"]);
+	 $("#median").text($("#median").text() + graphsData[graphID]["median"]);
+	 $("#std").text($("#std").text() + graphsData[graphID]["std"]);
+	 $("#vari").text($("#vari").text() + graphsData[graphID]["vari"]);
+	 $("#corrcoef").text($("#corrcoef").text() + graphsData[graphID]["corrcoef"]);
+	 $("#maxValue").text($("#maxValue").text() + graphsData[graphID]["maxValue"]);
+	 $("#minValue").text($("#minValue").text() + graphsData[graphID]["minValue"]);
+	 $("#std_err").text($("#std_err").text() + graphsData[graphID]["std_err"]);
+     });
+     
+     
+     
+    </script>
+{% endblock %}

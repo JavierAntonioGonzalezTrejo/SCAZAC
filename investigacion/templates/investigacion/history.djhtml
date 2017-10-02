@@ -37,7 +37,7 @@
 			<button type="submit" method="post" class="btn btn-primary" name="actionHistory" value="1" name="actionHistory">Graficar</button>
 		    </div>
 		    <div class="form-actions form-group">
-			<button type="submit" method="post" class="btn btn-danger" name="actionHistory" value="2">Borrar elementos seleccionados</button>
+			<button id="delateGraph" type="submit" method="post" class="btn btn-danger" name="actionHistory" value="2">Borrar elementos seleccionados</button>
 		    </div>
 		    <div class="form-actions form-group">
 			<button type="submit" method="post" class="btn btn-info" name="actionHistory" value="3">Buscar Grafica</button>
@@ -113,7 +113,12 @@
 	 $("#std_err").text($("#std_err").text() + graphsData[graphID]["std_err"]);
      });
      
-     
-     
+     $("#delateGraph").click(function (){
+	 alert("Se borraran las graficas seleccionadas, presione ok para proceder, atras para cancelar.");
+     });
+	 
+    </script>
+    <script>
+     {{ delateAlert| safe }}
     </script>
 {% endblock %}

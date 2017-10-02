@@ -1,0 +1,123 @@
+{% extends "site_base.html" %}
+<!-- Created 20170924 -->
+<!-- Modified 20170927 -->
+{% load i18n %}
+{% block styles %}
+    {% include "_styles.html" %}
+    <style>
+     .bk-root{
+	 z-index:1;
+     }
+    </style>
+{% endblock %}
+{% block head_title %}Normatividad{% endblock %}
+
+{% block body_class %}investigacion-norm{% endblock %}
+{% block body_base %}
+    <div class="container">
+	<div class="row">
+	    <div class="col-md-12">
+		<form action="{% url 'investigacion:normatividad' %}" method="post" class="form-inline"> {% csrf_token %}<!-- Form added 20170925 -->
+		    <fieldset><!-- The form is created on this way to use boostrap which django has not by standar -->
+			<legend>Normatividad</legend>
+			{% for field in normForm %}
+			    {% if field.errors %}
+				<div class="form-group error">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					<span class="help-inline">
+					    {% for error in  field.errors %}{{ error }}{% endfor %}
+					</span>
+				    </div>
+				</div>
+			    {% else %}
+				<div class="form-group">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					{% if field.help_text %}
+					    <p class="help-inline"><small>{{ field.help_text }}</small></p>
+					{% endif %}
+				    </div>
+				</div>
+			    {% endif %}
+			{% endfor %}
+		    </fieldset>
+		    <div class="form-actions form-group">
+			<button type="submit" method="post" class="btn btn-primary" >Mostrar Normatividad</button>
+		    </div>
+		    <!-- 20170928 Eliminated second button. Option to save now added on the form. -->
+		</form>
+		<div class="row">
+		    <table class="table table-bordered">
+			<thead>
+			    <tr>
+				<th>Contaminante Criterio</th>
+				<th>Promedio de Analisis</th>
+				<th>Promedio por N horas (ppm)</th>
+				<th>NOM</th>
+			    </tr>
+			</thead>
+			<tbody>
+			    <tr>
+				<th>Ozono(O3)</th>
+				<th>6 meses</th>
+				<th>{{ normListData.0 |safe }} ppm por 8 horas</th>
+				<th>NOM-022-SSA1-2014 (0.11 ppm)</th>
+			    </tr>
+			    <tr>
+				<th>Monoxido de Carbono (CO)</th>
+				<th>6 meses</th>
+				<th>{{ normListData.1 |safe }} ppm por 8 horas</th>
+				<th>NOM-021-SSA1-1993 (11 ppm)</th>
+			    </tr>
+			    <tr>
+				<th>NO</th>
+				<th>6 meses</th>
+				<th>{{ normListData.2 |safe }} ppm por 1 hora</th>
+				<th>NOM-023-SSA1-1993 (0.21 ppm)</th>
+			    </tr>
+			    <tr>
+				<th>NO2</th>
+				<th>6 meses</th>
+				<th>{{ normListData.3 |safe }} ppm por 1 hora</th>
+				<th>NOM-023-SSA1-1993 (0.21 ppm)</th>
+			    </tr>
+			    <tr>
+				<th>NOX</th>
+				<th>6 meses</th>
+				<th>{{ normListData.4 |safe }} ppm por 1 hora</th>
+				<th>NOM-023-SSA1-1993 (0.21 ppm)</th>
+			    </tr>
+			    <tr>
+				<th>SO2</th>
+				<th>6 meses</th>
+				<th>{{ normListData.5 |safe }} ppm por 24 horas</th>
+				<th>NOM-022-SSA1-2010 (0.110 ppm)</th>
+			    </tr>
+			    <tr>
+				<th>PM 10</th>
+				<th>6 meses</th>
+				<th>{{ normListData.6 |safe }} ug/m3 por 24 horas</th>
+				<th>NOM-025-SSA1-2014 (75 ug/m3)</th>
+			    </tr>
+			    <tr>
+				<th>PM 2.5</th>
+				<th>6 meses</th>
+				<th>{{ normListData.7 |safe }} ug/m3 por 24 horas</th>
+				<th>NOM-025-SSA1-1993 (65 ug/m3)</th>
+			    </tr>
+			</tbody>
+		    </table>
+		</div>
+	    </div>
+	</div>
+    </div>
+    <!-- Scripts taken of another webgl Bokeh graph to use webgl capabilities -->
+    <link rel="stylesheet" href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.9.min.css" type="text/css" />
+    
+    <script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.9.min.js"></script>
+    <script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-gl-0.12.9.min.js"></script>
+    <script>
+     {{ save_function | safe }}
+    </script>
+{% endblock %}

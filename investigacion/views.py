@@ -5,7 +5,7 @@ from django.shortcuts import render
 from django.conf import settings
 from django import forms        # Added 20171001 Make 
 from investigacion.models import MonitoringStation, MonitoringData, GraphsRecord
-from investigacion.forms import GraphsForm
+from investigacion.forms import GraphsForm, NormForm
 from django.views.generic import TemplateView
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.embed import components
@@ -27,22 +27,11 @@ class Principal(TemplateView):
         """Initial Function"""
         
         station = MonitoringStation.objects.all()[0]
-        graphForm = GraphsForm({ 'graph_type':"1", 'airMeasureY':"1", 'airMeasureX':"0", 'initialDate':str(station.dateNewestRegister), 'finalDate':str(station.dateNewestRegister),'monitoringStation':str(station.serialNumber), 'glyph_type':"2",'name':"Grafica de Prueba"})
+        formInitialValues = { 'graph_type':"1", 'airMeasureY':"1", 'airMeasureX':"0", 'initialDate':str(station.dateNewestRegister), 'finalDate':str(station.dateNewestRegister),'monitoringStation':str(station.serialNumber), 'glyph_type':"2",'name':"Grafica de Prueba"}
+        graphForm = GraphsForm(formInitialValues)
         
-        retrivedData = Principal.dataModel.objects.filter(idStation__pk=station.serialNumber).filter(fecha__icontains=station.dateNewestRegister)
-        time = [data.fecha for data in retrivedData]
-        ozono = [float(data.o3) for data in retrivedData]
-
-        plot = figure(responsive=True,  x_axis_type="datetime", output_backend="webgl")
-        r = plot.scatter(time, ozono, legend="Ozono vs Tiempo")
-
-        
-
+        plot, std_err, statistics = createAGraph(formInitialValues)
         script, div = components(plot)
-
-        # Statistics part
-        statistics = statisticsValues(ozono, range(0,len(time)))
-        
         return render(request, "investigacion/homepage.djhtml",
                       {'graphForm': graphForm,
                        "the_script":script,
@@ -53,7 +42,8 @@ class Principal(TemplateView):
                        "var":statistics[3],
                        "corrcoef":statistics[4][0],
                        "max":statistics[5],
-                       "min":statistics[6]})
+                       "min":statistics[6],
+                       "std_err":std_err})
     
     def post(self, request):
         """Function that recives the petitions to graph"""
@@ -61,7 +51,7 @@ class Principal(TemplateView):
         
         if graphForm.is_valid():
             save_function = ""
-            plot, std_err, statisticsData = createAGraph(request)
+            plot, std_err, statisticsData = createAGraph(request.POST)
             
             script, div = components(plot)
             
@@ -144,6 +134,13 @@ class GraphsRecordView(TemplateView):
 
             # Graph an the first selection.
             if request.POST["actionHistory"] == "1":
+                # The Form do not requir a graphs selected so in case non is selected an alert appers
+                if not("graphsUser" in request.POST):
+                    delateAlert = "alert(\"No se selecciono ninguna grafica!!!\");"
+                    return render(request, "investigacion/history.djhtml",
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs),
+                         "delateAlert":delateAlert})
                 graph = GraphsRecord.objects.filter(author__pk=request.user.id).get(pk=request.POST["graphsUser"])
                 graphForm = GraphsForm({ 'graph_type':str(graph.graph_type), 'airMeasureY':str(graph.airMeasureY), 'airMeasureX':str(graph.airMeasureX), 'initialDate':str(graph.initialDate), 'finalDate':str(graph.finalDate),'monitoringStation':str(graph.monitoringStation.serialNumber), 'glyph_type':str(graph.glyph_type),'name':graph.name, 'eliminate_error_sampling':graph.eliminate_error_sampling}
                 )
@@ -159,325 +156,108 @@ class GraphsRecordView(TemplateView):
                            "max":graph.maxValue,
                            "min":graph.minValue,
                            "std_err": graph.std_err})
+            elif request.POST["actionHistory"] == "2":
+                if not("graphsUser" in request.POST):
+                    delateAlert = "alert(\"No se selecciono ninguna grafica!!!\");"
+                    return render(request, "investigacion/history.djhtml",
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs),
+                         "delateAlert":delateAlert})
+                eliminateARegister(GraphsRecord, form.cleaned_data["graphsUser"])
+                remainingGraphs = GraphsRecord.objects.filter(author__pk=request.user.id)
+                formGraph = defineFormHistoryForm(remainingGraphs)
+                form = formGraph()
+                delateAlert = "alert(\"Se han eliminado existosamente las graficas!!!\");"
                 return render(request, "investigacion/history.djhtml",
-                          {"historyForm": form,
-                           "descriptionGraphs":json.dumps(descriptionGraphs)})
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs),
+                         "delateAlert":delateAlert})
+            elif request.POST["actionHistory"] == "3":
+                
+                userGraphs = GraphsRecord.objects.filter(name__icontains=request.POST["name"]).filter(date__icontains=request.POST["initialDate"]).values_list('id', flat=True)
+                print request.POST["initialDate"]
+                userGraphs = [id for id in userGraphs]
+                form = HistoryForm({"graphsUser":userGraphs, "name":request.POST["name"], "initialDate":request.POST["initialDate"]})
+                
+                delateAlert = "alert(\"Si se encontraron coincidencias, se mostraran remarcadas en la forma.\");"
+                return render(request, "investigacion/history.djhtml",
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs),
+                         "delateAlert":delateAlert})
+                
         else:
-            return render(request, "investigacion/history.djhtml",{"historyForm": form})
+            return render(request, "investigacion/history.djhtml",
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs)})
         
 
-def createAGraph(request):      # Created 20170930 Help to have a uniqe way to graph creation
-    """Helper function to create graphs"""
-    std_err = "No Aplica" # In case that the user do not select regression, the std_error will show a non apply.
-    firstDate = dateutil.parser.parse(request.POST["initialDate"])
-    lastDate = dateutil.parser.parse(request.POST["finalDate"])
+class NormativityView(TemplateView): # Added 20171001 Requirment F2-5
+    """Function View for the normativity of the pollants infesting the monitored station areas"""
 
-    # Get the data #####################################################################
-    if firstDate > lastDate:
-        return render(request, "investigacion/homepage.djhtml",
-                      {'graphForm': graphForm,
-                       'the_div': "<h1>LA FECHA INICIAL DEBE DEL PRIMER REGISTRO DEBE DE SER MENOR QUE LA DEL ULTIMO REGISTRO!</h1>"})
-    if firstDate == lastDate:
-        listX, listY = setListsXYSameDate(request)
-    else:
-        listX, listY = setListsXY(request.POST["initialDate"], request.POST["finalDate"], request)
-    if len(listX) == 0:
-        return render(request, "investigacion/homepage.djhtml",{'graphForm': graphForm, 'the_div': "<h1>NO SE ENCONTRO NINGUN REGISTRO CON LAS FECHAS ESPESIFICADAS!</h1>"})
-
-    ##########################################################
-            
-    # Utilice enhancement  if selected by the user
-    if "eliminate_error_sampling" in request.POST:
-        if not(int(request.POST["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE):
-            outlierFunc = defineReject_outliers(listX, 6)
-            listX = reduce(outlierFunc, listX, [])
-        if not(int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE):
-            outlierFunc = defineReject_outliers(listY, 6)
-            listY = reduce(outlierFunc, listY, [])
-                
-            
-    # Obtain the statistics tuple
-    if not(int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE):
-        # The dates can be utilices as normal aritmet, and range() function is used insted
-        if int(request.POST["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
-            statisticsData = statisticsValues(listY, range(len(listX))) 
-        else:
-            statisticsData = statisticsValues(listY, listX)
-    else:
-        statisticsData = ("No aplica.", "No aplica.", "No aplica.","No aplica.", "No aplica.", "No aplica.", "No aplica.")
-
-    # Apply customization for the plot
-    if int(request.POST["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
-        if int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
-            plot = figure(responsive=True,  x_axis_type="datetime", output_backend="webgl", y_axis_type="datetime", )
-        else:
-            plot = figure(responsive=True,  x_axis_type="datetime", output_backend="webgl")
-    else:
-        if int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
-            plot = figure(responsive=True, output_backend="webgl", y_axis_type="datetime")
-        else:
-            plot = figure(responsive=True, output_backend="webgl")
-    if len(listY) >=  25920:
-        glyphAlpha = 0.1
-    else:
-        glyphAlpha = 1
-                
-    # Put a little message for each point on the graph.
-    dataSource = ColumnDataSource(data=dict(
-        x=listX,
-        y=listY,
-    ))
-    hoverTool = HoverTool(tooltips=[
-        ("(" + GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureX"])][1]+"," + GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureY"])][1]+ ")", "($x, $y)"),
-    ])
-    plot.add_tools(hoverTool)
-
-    # Check if the graphs uses points or lines
-    if int(request.POST["glyph_type"]) == GraphsRecord.LINE_GLYPH_TYPE:
-        r = plot.line('x', 'y', legend=GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureX"])][1]+ " vs " + GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureY"])][1], line_width=glyphAlpha, source=dataSource)
-    else:
-        r = plot.scatter('x', 'y', legend=GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureX"])][1]+ " vs " + GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureY"])][1], alpha=glyphAlpha, source=dataSource)
-
-    # Create the Regression line or not
-    if int(request.POST["graph_type"]) == GraphsRecord.REGRESION_GRAPH_TYPE:
-        if int(request.POST["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
-            if int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
-                rango = range(len(listX))
-                newDataY, std_err = linearRegresionData(rango, rango)
-            else:
-                newDataY, std_err = linearRegresionData(range(len(listX)), listY)
-        else:
-            if int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
-                newDataY, std_err = linearRegresionData(listX, range(len(listX)))
-            else:
-                newDataY, std_err = linearRegresionData(listX, listY)
-                
-        dataSourceReg = ColumnDataSource(data=dict(
-            xReg=listX,
-            yReg=newDataY,
-        ))
+    def get(self, request):
+        """Initial Function"""
+        normForm = NormForm()
         
-        r = plot.line('xReg', 'yReg', legend=GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureX"])][1]+ " vs " + GraphsRecord.AIRMEASURE_CHOICES[int(request.POST["airMeasureY"])][1] + "(Linea)", source=dataSourceReg, color='#ffb302', line_width=5)
-        plot.legend.click_policy="hide"
-    plot.title.text = 'Fecha correspondiente entre ' + request.POST['initialDate'] + " y " + request.POST['finalDate']
+        return render(request, "investigacion/norm.djhtml",
+                          {"normForm":normForm})
+        
+        return render(request, "investigacion/norm.djhtml",
+                      {"normForm":normForm})
+    def post(self, request):
+        """Function that recives all the POST pettions"""
+        normForm = NormForm(request.POST)
+        if normForm.is_valid():
+            normListData = normByStation(MonitoringStation.objects.get(pk=request.POST["monitoringStation"]))
+            return render(request, "investigacion/norm.djhtml",
+                          {"normForm":normForm,
+                           "normListData":normListData})
+        return render(request, "investigacion/norm.djhtml",
+                          {"normForm":normForm})
 
-    return plot, std_err, statisticsData
+def normByStation(station):     # Added 20171001
+    """station: MonitoringStation Object. Generates a list consisting of 8 means of 1 to 8 hours intervals depending on the pollant over an avarage of the previus 6 monitored months of the given station which firt value is the name of the monitored place."""
+    meanStationList = []
+    last6MonthInitialDate = monthdelta(station.dateNewestRegister, -6)
+    #######################################
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.O3_AIRMEASURE ,station.serialNumber, 8))
 
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.CO_AIRMEASURE ,station.serialNumber, 8))
 
-def setListsXY(firstDate,lastDate, request):
-    """Sets the lists X and Y whit the respective air quality element depending on the user choices"""
-    if int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('fecha', flat=True)
-        listY = [station for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.O3_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('o3', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.CO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('co', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.NO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('no', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.NO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('no2', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.NOX_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('nox', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.SO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('so2', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.TEMPAMB_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('temperaturaAmbiente', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.HUMEDAD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('humedadRelativa', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.WS_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('ws', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.WD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('wd', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PRESBARO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('presionBarometrica', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.RADSOLAR_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('radiacionSolar', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PRECIPITACION_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('precipitacion', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PM10_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('pm10', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PM25_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('pm25', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.NO_AIRMEASURE ,station.serialNumber, 1))
 
-    # For the list X
-    if int(request.POST["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('fecha', flat=True)
-        listX = [station for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.O3_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('o3', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.CO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('co', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.NO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('no', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.NO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('no2', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.NOX_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('nox', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.SO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('so2', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.TEMPAMB_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('temperaturaAmbiente', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.HUMEDAD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('humedadRelativa', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.WS_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('ws', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.WD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('wd', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PRESBARO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('presionBarometrica', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.RADSOLAR_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('radiacionSolar', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PRECIPITACION_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('precipitacion', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PM10_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('pm10', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PM25_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('pm25', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.NO2_AIRMEASURE ,station.serialNumber, 1))
+    
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.NOX_AIRMEASURE ,station.serialNumber, 1))
 
+    # Do not pass over 0,110 ppm over 24 hours
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.SO2_AIRMEASURE ,station.serialNumber, 24))
+
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.PM10_AIRMEASURE ,station.serialNumber, 24))
+    # Do not over pass 65
+    
+    meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.PM25_AIRMEASURE ,station.serialNumber, 24)) 
     
 
-    return listX, listY
+    return meanStationList
 
-def setListsXYSameDate(request):
-    """Sets the lists X and Y whit the respective air quality element depending on the user choices"""
-    if int(request.POST["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('fecha', flat=True)
-        listY = [station for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.O3_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('o3', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.CO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('co', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.NO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('no', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.NO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('no2', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.NOX_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('nox', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.SO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('so2', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.TEMPAMB_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('temperaturaAmbiente', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.HUMEDAD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('humedadRelativa', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.WS_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('ws', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.WD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('wd', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PRESBARO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('presionBarometrica', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.RADSOLAR_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('radiacionSolar', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PRECIPITACION_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('precipitacion', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PM10_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('pm10', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureY"]) == GraphsRecord.PM25_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('pm25', flat=True)
-        listY = [float(station) if not(isnan(float(station))) else 0  for station in query]
-
-    # For the list X
-    if int(request.POST["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('fecha', flat=True)
-        listX = [station for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.O3_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('o3', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.CO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('co', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.NO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('no', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.NO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('no2', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.NOX_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('nox', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.SO2_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('so2', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.TEMPAMB_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('temperaturaAmbiente', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.HUMEDAD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('humedadRelativa', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.WS_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('ws', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.WD_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('wd', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PRESBARO_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('presionBarometrica', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.RADSOLAR_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('radiacionSolar', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PRECIPITACION_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('precipitacion', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PM10_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('pm10', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-    elif int(request.POST["airMeasureX"]) == GraphsRecord.PM25_AIRMEASURE:
-        query = Principal.dataModel.objects.filter(idStation__pk=request.POST["monitoringStation"]).filter(fecha__icontains=request.POST['initialDate']).values_list('pm25', flat=True)
-        listX = [float(station) if not(isnan(float(station))) else 0  for station in query]
-
+def helperNormMean(last6MonthInitialDate,dateNewestRegister,pollant,serialNumber, hour):
+    """Helper function that wraps 3 preduceres on one. Returns the output of normByElement"""
+    bufferList = setListElement(last6MonthInitialDate,dateNewestRegister,pollant ,serialNumber)
+    outlierFunc = defineReject_outliers(bufferList, 6)
+    return normByElement(reduce(outlierFunc, bufferList, []), hour)
     
-
-    return listX, listY
+def normByElement(listElement, hours):
+    """elementList: A list consisted by values of the corresponging elements (Each value represents a 5 minutes of monitoring activitie on the station), hours: how much data will be taken to produce a mean (1 hour=12recordings). Returns a mean value corresponding to the given hour interval. """
+    numberOfMeasurments = (hours * 60) / 5
+    meanList = []
+    for i in range(len(listElement)):
+        meanList.append(numpy.mean(listElement[i:i+hours]))
+    return numpy.mean(meanList)
 
 def statisticsValues(dataY, dataX):
     """Obtain the mean, median, std, var, corrcoef, max and min of the selected data on this order"""
-    if None in dataY:
-        print "hola"
+    if len(dataY) == 0:
+        return ("Sin Datos", "Sin Datos", "Sin Datos", "Sin Datos", "Sin Datos", "Sin Datos", "Sin Datos")
     return (numpy.nanmean(dataY), numpy.nanmedian(dataY), numpy.nanstd(dataY), numpy.nanvar(dataY), pearsonr(dataY, dataX), numpy.nanmax(dataY), numpy.nanmin(dataY))
 
 # Provided by Benjamin Bannierstack overflow
@@ -535,7 +315,230 @@ def defineFormHistoryForm(userGraphs):
     
     class HistoryForm(forms.Form):
         """Runtime defined class used to the requirment F2-3 form"""
-        graphsUser = forms.MultipleChoiceField(label="Seleccione varias graficas para eliminar o solo una para graficar.", choices=USERGRAPHS_CHOICES,  help_text="Seleccione una opcion para graficar o multiples opciones para borrar (Si se seleccionaron varias opciones y se opto por graficar, solamente la opción que este mas arriba de la forma se graficara.)")
+        graphsUser = forms.MultipleChoiceField(label="Seleccione varias graficas para eliminar o solo una para graficar.", choices=USERGRAPHS_CHOICES,  help_text="Seleccione una opcion para graficar o multiples opciones para borrar (Si se seleccionaron varias opciones y se opto por graficar, solamente la opción que este mas arriba de la forma se graficara.)", required=False)
         name = forms.CharField(label="Busqueda mediante nombre.", empty_value=None, max_length=80, error_messages={'max_length': "Solo se aceptan cadenas de hasta 80 caracteres."},  required=False)
         initialDate = forms.DateTimeField(label="Busqueda mediante fecha.",help_text="Ingrese una fecha para buscar la grafica. (2006-10-25, 2006-10-25 14:30, 2006-10-25 14; donde el ultimo parametro es la hora de la consulta)", error_messages={'required':"Se necesita que ingrese una fecha de inicio!" , 'invalid':"Ingrese una fecha valida!"}, input_formats=['%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H',], required=False )
     return HistoryForm
+
+def eliminateARegister(model, list2Eliminate):
+    """Returns a boolean list indicated which elements where eliminated.model of objects to eliminate form the database, list2Eliminate whit the primary keys to eliminate"""
+    if len(list2Eliminate) == 0:
+        return []
+    else:
+        model.objects.get(pk=list2Eliminate[0]).delete()
+    return [True] + eliminateARegister(model, list2Eliminate[1:])
+        
+
+def setListElement(firstDate,lastDate, element, stationID):
+    """Sets the lists X and Y whit the respective air quality element depending on the user choices"""
+    if element == GraphsRecord.FECHA_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('fecha', flat=True)
+        listElement = [station for station in query]
+    elif element == GraphsRecord.O3_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('o3', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.CO_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('co', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.NO_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('no', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.NO2_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('no2', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.NOX_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('nox', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.SO2_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('so2', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.TEMPAMB_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('temperaturaAmbiente', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.HUMEDAD_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('humedadRelativa', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.WS_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('ws', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.WD_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('wd', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PRESBARO_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('presionBarometrica', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.RADSOLAR_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('radiacionSolar', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PRECIPITACION_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('precipitacion', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PM10_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('pm10', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PM25_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__gte=firstDate).filter(fecha__lte=lastDate).values_list('pm25', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+
+    
+    return listElement
+
+
+def createAGraph(request):      # Created 20170930 Help to have a uniqe way to graph creation
+    """Helper function to create graphs. Request is a dictionary holding the returned GraphsForm user responses"""
+    std_err = "No Aplica" # In case that the user do not select regression, the std_error will show a non apply.
+    firstDate = dateutil.parser.parse(request["initialDate"])
+    lastDate = dateutil.parser.parse(request["finalDate"])
+
+    # Get the data #####################################################################
+    if firstDate > lastDate:
+        return render(request, "investigacion/homepage.djhtml",
+                      {'graphForm': graphForm,
+                       'the_div': "<h1>LA FECHA INICIAL DEBE DEL PRIMER REGISTRO DEBE DE SER MENOR QUE LA DEL ULTIMO REGISTRO!</h1>"})
+    if firstDate == lastDate:
+        listX = setListElementSameDate(request["initialDate"], int(request["airMeasureX"]), request["monitoringStation"])
+        listY = setListElementSameDate(request["initialDate"], int(request["airMeasureY"]), request["monitoringStation"])
+    else:
+        listX = setListElement(request["initialDate"], request["finalDate"], int(request["airMeasureX"]))
+        listX = setListElement(request["initialDate"], request["finalDate"], int(request["airMeasureY"]))
+    if len(listX) == 0:
+        return render(request, "investigacion/homepage.djhtml",{'graphForm': graphForm, 'the_div': "<h1>NO SE ENCONTRO NINGUN REGISTRO CON LAS FECHAS ESPESIFICADAS!</h1>"})
+
+    ##########################################################
+            
+    # Utilice enhancement  if selected by the user
+    if "eliminate_error_sampling" in request:
+        if not(int(request["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE):
+            outlierFunc = defineReject_outliers(listX, 6)
+            listX = reduce(outlierFunc, listX, [])
+        if not(int(request["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE):
+            outlierFunc = defineReject_outliers(listY, 6)
+            listY = reduce(outlierFunc, listY, [])
+                
+            
+    # Obtain the statistics tuple
+    if not(int(request["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE):
+        # The dates can be utilices as normal aritmet, and range() function is used insted
+        if int(request["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
+            statisticsData = statisticsValues(listY, range(len(listX))) 
+        else:
+            statisticsData = statisticsValues(listY, listX)
+    else:
+        statisticsData = ("No aplica.", "No aplica.", "No aplica.","No aplica.", "No aplica.", "No aplica.", "No aplica.")
+
+    # Apply customization for the plot
+    if int(request["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
+        if int(request["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
+            plot = figure(responsive=True,  x_axis_type="datetime", output_backend="webgl", y_axis_type="datetime", )
+        else:
+            plot = figure(responsive=True,  x_axis_type="datetime", output_backend="webgl")
+    else:
+        if int(request["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
+            plot = figure(responsive=True, output_backend="webgl", y_axis_type="datetime")
+        else:
+            plot = figure(responsive=True, output_backend="webgl")
+    if len(listY) >=  25920:
+        glyphAlpha = 0.1
+    else:
+        glyphAlpha = 1
+                
+    # Put a little message for each point on the graph.
+    dataSource = ColumnDataSource(data=dict(
+        x=listX,
+        y=listY,
+    ))
+    hoverTool = HoverTool(tooltips=[
+        ("(" + GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureX"])][1]+"," + GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureY"])][1]+ ")", "($x, $y)"),
+    ])
+    plot.add_tools(hoverTool)
+
+    # Check if the graphs uses points or lines
+    if int(request["glyph_type"]) == GraphsRecord.LINE_GLYPH_TYPE:
+        r = plot.line('x', 'y', legend=GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureX"])][1]+ " vs " + GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureY"])][1], line_width=glyphAlpha, source=dataSource)
+    else:
+        r = plot.scatter('x', 'y', legend=GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureX"])][1]+ " vs " + GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureY"])][1], alpha=glyphAlpha, source=dataSource)
+
+    # Create the Regression line or not
+    if int(request["graph_type"]) == GraphsRecord.REGRESION_GRAPH_TYPE:
+        if int(request["airMeasureX"]) == GraphsRecord.FECHA_AIRMEASURE:
+            if int(request["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
+                rango = range(len(listX))
+                newDataY, std_err = linearRegresionData(rango, rango)
+            else:
+                newDataY, std_err = linearRegresionData(range(len(listX)), listY)
+        else:
+            if int(request["airMeasureY"]) == GraphsRecord.FECHA_AIRMEASURE:
+                newDataY, std_err = linearRegresionData(listX, range(len(listX)))
+            else:
+                newDataY, std_err = linearRegresionData(listX, listY)
+                
+        dataSourceReg = ColumnDataSource(data=dict(
+            xReg=listX,
+            yReg=newDataY,
+        ))
+        
+        r = plot.line('xReg', 'yReg', legend=GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureX"])][1]+ " vs " + GraphsRecord.AIRMEASURE_CHOICES[int(request["airMeasureY"])][1] + "(Linea)", source=dataSourceReg, color='#ffb302', line_width=5)
+        plot.legend.click_policy="hide"
+    plot.title.text = 'Fecha correspondiente entre ' + request['initialDate'] + " y " + request['finalDate']
+
+    return plot, std_err, statisticsData
+
+def setListElementSameDate(date, element, stationID):
+    """Sets the lists X and Y whit the respective air quality element depending on the user choices"""
+    if element == GraphsRecord.FECHA_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('fecha', flat=True)
+        listElement = [station for station in query]
+    elif element == GraphsRecord.O3_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('o3', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.CO_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('co', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.NO_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('no', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.NO2_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('no2', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.NOX_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('nox', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.SO2_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('so2', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.TEMPAMB_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('temperaturaAmbiente', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.HUMEDAD_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('humedadRelativa', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.WS_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('ws', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.WD_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('wd', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PRESBARO_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('presionBarometrica', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.RADSOLAR_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('radiacionSolar', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PRECIPITACION_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('precipitacion', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PM10_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('pm10', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]
+    elif element == GraphsRecord.PM25_AIRMEASURE:
+        query = Principal.dataModel.objects.filter(idStation__pk=stationID).filter(fecha__icontains=date).values_list('pm25', flat=True)
+        listElement = [float(station) if not(isnan(float(station))) else 0  for station in query]  
+
+    return listElement
+# Provided by Duncan on StackOverflow
+def monthdelta(date, delta):
+    m, y = (date.month+delta) % 12, date.year + ((date.month)+delta-1) // 12
+    if not m: m = 12
+    d = min(date.day, [31,
+        29 if y%4==0 and not y%400==0 else 28,31,30,31,30,31,31,30,31,30,31][m-1])
+    return date.replace(day=d,month=m, year=y)

@@ -19,4 +19,5 @@ class GraphsForm(forms.Form):
     name = forms.CharField(label="Nombre de la grafica (Si se desea guardar en el historial)", empty_value=None, max_length=80, error_messages={'max_length': "Solo se aceptan cadenas de hasta 80 caracteres."},  required=False)
     
     
-
+class NormForm(forms.Form):     # Added 20171001 Form of requirment F2-5
+    monitoringStation = forms.ChoiceField(label="Estación de monitoreo", choices=tuple((station.serialNumber, station.nameMonitoringPlace) for station in MonitoringStation.objects.all()), help_text="Escoga la estación de monitoreo de donde se mostrara la normatividad.")

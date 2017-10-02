@@ -1,7 +1,7 @@
 {% load i18n %}
 {% load account_tags %}
 <!-- Modified 20170910: Hardcoded the color of all the text to white -->
-
+<!-- Modified 20171001: Link to requirment F2-6 changed and F2-5 added. -->
 <ul class="nav navbar-nav pull-right"> <!--nav navbar-nav pull-right   -->
     {% if request.user.is_authenticated %}
         <p style="color: white;" class="navbar-text">
@@ -11,10 +11,10 @@
     <a style="color: white;" href="{% url 'investigacion:principal' %}"><i class="fa fa-bar-chart-o"></i>Graficas</a>
   </li>
   <li>
-    <a style="color: white;" href="{% url 'investigacion:historial' %}"><i class="fa fa-archive"></i>Historial de Graficas</a> <!-- Added 20171001 User page to review saved graphs -->
+    <a style="color: white;" href="{% url 'investigacion:historial' %}"><i class="fa fa-archive"></i>Historial de Graficas y Reportes</a> <!-- Added 20171001 User page to review saved graphs:Changed 20171001 Added the requirment F2-6 -->
   </li>
   <li>
-    <a style="color: white;" href="#"><i class="fa fa-file-text"></i>Generar Reporte</a>
+    <a style="color: white;" href="{% url 'investigacion:normatividad' %}"><i class="fa fa-file-text"></i>Cumplimiento de Normatividad</a> <!-- Changed 20171001 Removed link to requirment F2-6 to requirment F2-5 -->
   </li>
         <li>
             <a style="color: white;" href="{% url 'account_settings' %}"><i class="fa fa-cog"></i> {% trans "Settings" %}</a>

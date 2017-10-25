@@ -1,0 +1,78 @@
+{% extends "site_base.html" %}
+{% load staticfiles%}
+<!-- Created 20170924 -->
+<!-- Modified 20170927 -->
+{% load i18n %}
+{% block head_title %}Admin: {% endblock %}
+
+{% block body_class %}administracion-mapa{% endblock %}
+{% block body_base %}
+    <link rel="stylesheet" type="text/css" href="{% static "css/f1_1.css" %}">
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.2.1.min.js"></script><!-- The reson to put the script here is to have the $ reference up for the script downbelow -->
+    <div class="container">
+	<div class="row">
+	    <div class="col-md-4">
+		<form action="{% url 'administracion:mapa' %}" method="post"> {% csrf_token %}<!-- Form added 20171016 -->
+		    <fieldset><!-- The form is created on this way to use boostrap which django has not by standar -->
+			<legend>Modificar configuración del mapa principal.</legend>
+			{% for field in mapSettingsForm %}
+			    {% if field.errors %}
+				<div class="form-group error">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					<span class="help-inline">
+					    {% for error in  field.errors %}{{ error }}{% endfor %}
+					</span>
+				    </div>
+				</div>
+			    {% else %}
+				<div class="form-group">
+				    <label class="form-label">{{ field.label }}</label> 
+				    <div class="controls">{{ field }}
+					{% if field.help_text %}
+					    <p class="help-inline"><small>{{ field.help_text }}</small></p>
+					{% endif %}
+				    </div>
+				</div>
+			    {% endif %}
+			{% endfor %}
+		    </fieldset>
+		    <div class="form-actions form-group">
+			<button id="modify" type="submit" method="post" class="btn btn-danger" >Modificar</button>
+		    </div>
+		    <!-- 20170928 Eliminated second button. Option to save now added on the form. -->
+		</form>
+	    </div><!-- Next to this div will go the map -->
+	    <div id="map" class="col-md-8"></div>
+	</div>
+    </div>
+    <!-- Scripts taken of another webgl Bokeh graph to use webgl capabilities -->
+    <script>
+     {{ alertModified | safe }}
+    </script>
+    <script>
+     $("#modify").click(function (){
+	 alert("Seguro de modificar la configuración del mapa? Para retroceder presione el boton [Atras] de su navegador.");
+     });
+     
+     function initMap() {
+         var originalMapCenter = new google.maps.LatLng({{ centerLatitude|safe }}, {{ centerLength|safe }});
+	 console.log(parseFloat($("#id_centerLength").val()))
+	 var map = new google.maps.Map(document.getElementById('map'), {
+	     
+             zoom: {{ zoom|safe }},
+             center: originalMapCenter
+	 });
+	 map.addListener('zoom_changed', function() {
+             $("#id_zoom").val(map.getZoom());
+         });
+	 map.addListener('center_changed', function() {
+             $("#id_centerLatitude").val(map.getCenter().lat().toFixed(7));
+	     $("#id_centerLength").val(map.getCenter().lng().toFixed(7));
+         });
+     }
+     
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ keyGoogleMap|safe }};callback=initMap"> 
+    </script><!-- The server side will provide a key to use on the map  -->
+{% endblock %}

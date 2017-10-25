@@ -2,14 +2,15 @@
 <!-- Modification Register -->
 <!-- Modification 20170727: Added to all URL reversed the corresponding namespace -->
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css">
-    <link rel="stylesheet" href="https://pingendo.github.io/templates/blank/theme.css" type="text/css">
-    {% block customcss %}<!-- Add Custom CSS to the Template -->
-	<link rel="stylesheet" type="text/css" href="{% static "css/f1_1.css" %}"> </head> <!-- f1.1css -->
-    {% endblock %}
+    <head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css">
+	<link rel="stylesheet" href="https://pingendo.github.io/templates/blank/theme.css" type="text/css">
+	{% block customcss %}<!-- Add Custom CSS to the Template -->
+	    <link rel="stylesheet" type="text/css" href="{% static "css/f1_1.css" %}"><!-- f1.1css -->
+	{% endblock %}
+    </head>
     <title>{% block title %}Sistema de Calidad del Aire del Estado de Zacatecas{% endblock %}</title> <!-- Added 20170723 -->          
     <body>
 	<nav class="navbar navbar-expand-md bg-primary text-right navbar-inverse">

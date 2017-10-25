@@ -3,5 +3,19 @@
   .scazacBar{
   background-color: #00b0eb;
   color: #FFFFFF;
- }
+  }
+  
 </style>
+{% if request.user.is_superuser %} <!-- Modified 20171016: Added padding to the  body to make room to the admin menu options-->
+<!-- Modified 20171025: Added 50px more to the view becausse the bar greow a litte more since the lasst time -->
+<style>
+  body {
+    padding-top: 250px;
+  }
+  @media (max-width: 768px) {
+  body {
+      padding-top: 60px;
+    }
+  }
+</style>
+{% endif %}

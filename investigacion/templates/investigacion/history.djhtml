@@ -42,6 +42,9 @@
 		    <div class="form-actions form-group">
 			<button type="submit" method="post" class="btn btn-info" name="actionHistory" value="3">Buscar Grafica</button>
 		    </div>
+		    <div class="form-actions form-group">
+			<button type="submit" method="post" class="btn btn-info" name="actionHistory" value="4">Generar Reporte</button>
+		    </div>
 		</form>
 	    </div>
 	    <div class="col-md-8">
@@ -116,7 +119,7 @@
      $("#delateGraph").click(function (){
 	 alert("Se borraran las graficas seleccionadas, presione ok para proceder, atras para cancelar.");
      });
-	 
+     
     </script>
     <script>
      {{ delateAlert| safe }}

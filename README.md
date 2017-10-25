@@ -12,3 +12,8 @@ pip install -r requirements.txt
 ./manage.py loaddata sites
 ./manage.py runserver
 ```
+2.-Using npm, install the following:
+```
+npm install -g phantomjs-prebuilt
+```
+3.-Install latex and graphicx package

@@ -7,4 +7,6 @@ pinax-theme-bootstrap==7.10.1
 pillow==4.2.1
 pandas==0.20.3
 bokeh==0.12.9
-scipi==0.19.1
+scipy==0.19.1
+pylatex=1.2.1
+selenium=3.6.0

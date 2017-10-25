@@ -9,6 +9,7 @@
 # Modificated 20170807: On MonitoringData fecha no longer serves as the primary key (New primary key: id), make the combination of idStation and fecha unique for each register.
 # Modificated 20170926: GraphsRecord modified; Identify user and save generated graph.
 # Modificated 20170927: Calculat statistics values once.
+# Modificated 20171003: Save a photo of the generated graph on the GraphsRecord model
 from __future__ import unicode_literals
 from django.utils.encoding import python_2_unicode_compatible
 import math
@@ -140,7 +141,7 @@ class GraphsRecord(models.Model): # Added 20170925
     eliminate_error_sampling = models.BooleanField(default=False)
     script = models.TextField() # Added 20170926 Render the graph once
     div = models.TextField()    #
-    
+    photo = models.CharField(max_length=40,null=True ) # Added 20171003 Save the photo of the graphs to not calculate it dinamically on while generating graphs Will be as follows: settings.PROJECT_ROOT + "/static/graphsFolder/"+ str(datetime.datetime.now()).strip() +".png"
     mean = models.FloatField()  # Added 20170927: Calculate this values once.
     median = models.FloatField()
     std = models.FloatField()
@@ -149,6 +150,7 @@ class GraphsRecord(models.Model): # Added 20170925
     maxValue = models.FloatField()
     minValue = models.FloatField()
     std_err = models.FloatField(null=True)
+    
     
     def __str__(self):
         """Function to represent the model"""

@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 # Modified 20170930: Added the requirment F2-3
+# Modified 20141003: Save of a generated graph
 from __future__ import unicode_literals
+import os                       # Remove the Graphs photos from harddisk
 from django.shortcuts import render
+from django.http import HttpResponse
 from django.conf import settings
 from django import forms        # Added 20171001 Make 
 from investigacion.models import MonitoringStation, MonitoringData, GraphsRecord
@@ -10,13 +13,17 @@ from django.views.generic import TemplateView
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.embed import components
 from bokeh.models import HoverTool
+from bokeh.io import export_png # Added 20171002
 import dateutil.parser
 import numpy
 from math import isnan
 from scipy.stats import pearsonr, linregress
 from functools import reduce
 import datetime                 # Added 20171001: Time for the requirment F2-04
-import json                     # Added 20171001: To send information to the javascript side
+import json                    # Added 20171001: To send information to the javascript side
+import cStringIO as StringIO   # Added 20171003; Generate on memory the pdf reports.
+from tex import latex2pdf
+GRAPHSDIR = settings.PROJECT_ROOT + "/static/graphsFolder/" # Added 2017103 directory where the graphs will be saved
 class Principal(TemplateView):
     """Class that holds the requirment F2-3"""
     dataModel = MonitoringData
@@ -32,6 +39,7 @@ class Principal(TemplateView):
         
         plot, std_err, statistics = createAGraph(formInitialValues)
         script, div = components(plot)
+        
         return render(request, "investigacion/homepage.djhtml",
                       {'graphForm': graphForm,
                        "the_script":script,
@@ -52,7 +60,12 @@ class Principal(TemplateView):
         if graphForm.is_valid():
             save_function = ""
             plot, std_err, statisticsData = createAGraph(request.POST)
-            
+            if plot == 2:
+                return render(request, "investigacion/homepage.djhtml",{'graphForm': graphForm, 'the_div': "<h1>NO SE ENCONTRO NINGUN REGISTRO CON LAS FECHAS ESPESIFICADAS!</h1>"})
+            elif plot == 1:
+                return render(request, "investigacion/homepage.djhtml",
+                              {'graphForm': graphForm,
+                               'the_div': "<h1>LA FECHA INICIAL DEBE DEL PRIMER REGISTRO DEBE DE SER MENOR QUE LA DEL ULTIMO REGISTRO!</h1>"})
             script, div = components(plot)
             
             if 'save_graph' in request.POST:
@@ -76,7 +89,9 @@ class Principal(TemplateView):
                     newGraph.eliminate_error_sampling = "eliminate_error_sampling" in request.POST
                     newGraph.script = script
                     newGraph.div = div
-
+                    newGraph.photo = str(request.user.id) + datetime.datetime.now().strftime("%Y%M%d%H%M%S%f") +".png" # Not saving the root makes the database more suitable to transfer between servers: Error corrected, used strftime to eliminate the point which latex wrongly ses as another formar diferent from a png
+                    photoPath =  GRAPHSDIR + newGraph.photo
+                    print (export_png(plot, filename=photoPath))
                     newGraph.mean = statisticsData[0]
                     newGraph.median = statisticsData[1]
                     newGraph.std = statisticsData[2]
@@ -173,9 +188,15 @@ class GraphsRecordView(TemplateView):
                          "descriptionGraphs":json.dumps(descriptionGraphs),
                          "delateAlert":delateAlert})
             elif request.POST["actionHistory"] == "3":
+                if not("graphsUser" in request.POST):
+                    delateAlert = "alert(\"No se selecciono ninguna grafica!!!\");"
+                    return render(request, "investigacion/history.djhtml",
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs),
+                         "delateAlert":delateAlert})
+                
                 
                 userGraphs = GraphsRecord.objects.filter(name__icontains=request.POST["name"]).filter(date__icontains=request.POST["initialDate"]).values_list('id', flat=True)
-                print request.POST["initialDate"]
                 userGraphs = [id for id in userGraphs]
                 form = HistoryForm({"graphsUser":userGraphs, "name":request.POST["name"], "initialDate":request.POST["initialDate"]})
                 
@@ -184,7 +205,21 @@ class GraphsRecordView(TemplateView):
                         {"historyForm": form,
                          "descriptionGraphs":json.dumps(descriptionGraphs),
                          "delateAlert":delateAlert})
-                
+            
+            elif request.POST["actionHistory"] == "4":
+                if not("graphsUser" in request.POST):
+                    delateAlert = "alert(\"No se selecciono ninguna grafica!!!\");"
+                    return render(request, "investigacion/history.djhtml",
+                        {"historyForm": form,
+                         "descriptionGraphs":json.dumps(descriptionGraphs),
+                         "delateAlert":delateAlert})
+                report = StringIO.StringIO()
+                report.write(generateGraphReport(form.cleaned_data["graphsUser"]))
+                report.seek(0)  # Rewind the pointer to the beggining of the file
+                response = HttpResponse(report.getvalue(), content_type='application/pdf')
+                response['Content-Disposition'] = 'attachment; filename=report' + str(datetime.datetime.now()) + '.pdf'
+        
+                return response
         else:
             return render(request, "investigacion/history.djhtml",
                         {"historyForm": form,
@@ -220,7 +255,7 @@ def normByStation(station):     # Added 20171001
     last6MonthInitialDate = monthdelta(station.dateNewestRegister, -6)
     #######################################
     meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.O3_AIRMEASURE ,station.serialNumber, 8))
-
+    
     meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.CO_AIRMEASURE ,station.serialNumber, 8))
 
     meanStationList.append(helperNormMean(last6MonthInitialDate,station.dateNewestRegister,GraphsRecord.NO_AIRMEASURE ,station.serialNumber, 1))
@@ -320,12 +355,14 @@ def defineFormHistoryForm(userGraphs):
         initialDate = forms.DateTimeField(label="Busqueda mediante fecha.",help_text="Ingrese una fecha para buscar la grafica. (2006-10-25, 2006-10-25 14:30, 2006-10-25 14; donde el ultimo parametro es la hora de la consulta)", error_messages={'required':"Se necesita que ingrese una fecha de inicio!" , 'invalid':"Ingrese una fecha valida!"}, input_formats=['%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H',], required=False )
     return HistoryForm
 
-def eliminateARegister(model, list2Eliminate):
+def eliminateARegister(model, list2Eliminate): # Modified 20171003 Eliminate the photo from harddrive
     """Returns a boolean list indicated which elements where eliminated.model of objects to eliminate form the database, list2Eliminate whit the primary keys to eliminate"""
     if len(list2Eliminate) == 0:
         return []
-    else:
-        model.objects.get(pk=list2Eliminate[0]).delete()
+    photoObject = model.objects.get(pk=list2Eliminate[0])
+    photoPath =  settings.PROJECT_ROOT + "/static/graphsFolder/" + photoObject.photo
+    os.remove(photoPath)
+    photoObject.delete()
     return [True] + eliminateARegister(model, list2Eliminate[1:])
         
 
@@ -392,17 +429,17 @@ def createAGraph(request):      # Created 20170930 Help to have a uniqe way to g
 
     # Get the data #####################################################################
     if firstDate > lastDate:
-        return render(request, "investigacion/homepage.djhtml",
-                      {'graphForm': graphForm,
-                       'the_div': "<h1>LA FECHA INICIAL DEBE DEL PRIMER REGISTRO DEBE DE SER MENOR QUE LA DEL ULTIMO REGISTRO!</h1>"})
+        return 1, 1, 1#render(request, "investigacion/homepage.djhtml",
+                      #{'graphForm': graphForm,
+                       #'the_div': "<h1>LA FECHA INICIAL DEBE DEL PRIMER REGISTRO DEBE DE SER MENOR QUE LA DEL ULTIMO REGISTRO!</h1>"})
     if firstDate == lastDate:
         listX = setListElementSameDate(request["initialDate"], int(request["airMeasureX"]), request["monitoringStation"])
         listY = setListElementSameDate(request["initialDate"], int(request["airMeasureY"]), request["monitoringStation"])
     else:
-        listX = setListElement(request["initialDate"], request["finalDate"], int(request["airMeasureX"]))
-        listX = setListElement(request["initialDate"], request["finalDate"], int(request["airMeasureY"]))
-    if len(listX) == 0:
-        return render(request, "investigacion/homepage.djhtml",{'graphForm': graphForm, 'the_div': "<h1>NO SE ENCONTRO NINGUN REGISTRO CON LAS FECHAS ESPESIFICADAS!</h1>"})
+        listX = setListElement(request["initialDate"], request["finalDate"], int(request["airMeasureX"]), request["monitoringStation"])
+        listY = setListElement(request["initialDate"], request["finalDate"], int(request["airMeasureY"]), request["monitoringStation"])
+    if len(listX) == 0 or len(listY) == 0:
+        return 2,2,2 #render(request, "investigacion/homepage.djhtml",{'graphForm': graphForm, 'the_div': "<h1>NO SE ENCONTRO NINGUN REGISTRO CON LAS FECHAS ESPESIFICADAS!</h1>"})
 
     ##########################################################
             
@@ -542,3 +579,55 @@ def monthdelta(date, delta):
     d = min(date.day, [31,
         29 if y%4==0 and not y%400==0 else 28,31,30,31,30,31,31,30,31,30,31][m-1])
     return date.replace(day=d,month=m, year=y)
+
+def generateGraphReport(listGraphs):
+    """Requirment F2-6. Returns a string whit pdf information to generate a report."""
+
+    beginDocument = """
+\\documentclass{article}
+\\usepackage{graphicx}
+\\begin{document}""".decode("utf-8")
+    graphDocument = r'''
+\begin{figure}[h]
+\centering
+\includegraphics[width=\textwidth]{GRAPHDIR}
+\end{figure}'''.decode("utf-8")
+    tableDocument = r'''
+\begin{center}
+\begin{tabular}{|c|c|}
+\hline
+\textbf{Estadisticas} & \textbf{Valor}  \\
+\hline
+Media & MEAN\\
+\hline
+Mediana & MEDIAN\\
+\hline
+Desviación Estándar & STDSTD\\
+\hline
+Varianza & VARI\\
+\hline
+Coeficiente de Correlación & CORRCOEF\\
+\hline
+Valor Máximo & MAXVALUE\\
+\hline
+Valor Minimo & MINVALUE\\
+\hline
+Error Estándar & STD_ERR\\
+\hline
+\end{tabular}
+\end{center}'''.decode("utf-8")
+    endDocument = r'''
+\end{document}'''.decode("utf-8")
+    def joinGraphs(latexDocument, graphID):
+        """Join the Graphs photo and tables."""
+        if len(listGraphs) == 0:
+            return listGraphs + endDocument
+        graph = GraphsRecord.objects.get(pk=graphID)
+        graphPhotoDir = GRAPHSDIR + graph.photo
+        graphLatex = graphDocument.replace("GRAPHDIR", graphPhotoDir)
+        tableLatex = tableDocument.replace("MEAN", str(graph.mean)).replace("MEDIAN", str(graph.median)).replace("STDSTD", str(graph.std)).replace("VARI", str(graph.vari)).replace("CORRCOEF", str(graph.corrcoef)).replace("MAXVALUE", str(graph.maxValue)).replace("MINVALUE", str(graph.minValue)).replace("STD_ERR", str(graph.std_err))
+        return latexDocument + graphLatex + tableLatex
+
+    completReport = beginDocument + reduce(joinGraphs, listGraphs, "") + endDocument
+
+    return latex2pdf(completReport)

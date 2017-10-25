@@ -1,0 +1,121 @@
+{% extends "site_base.html" %}
+{% load staticfiles%}
+<!-- Created 20170924 -->
+<!-- Modified 20170927 -->
+<!-- monitoringStationForm: Form of the MonitoringStation -->
+<!-- alertSaved: Show an alert when the user saves a monitoringStation -->
+<!-- centerLatitude and centerLength: Point of the center of the map -->
+<!-- zoom: How much of the map can be seen -->
+<!-- keyGoogleMap: key to access Google map API -->
+{% load i18n %}
+{% block head_title %}Admin: {% endblock %}
+
+{% block body_class %}administracion-mapa{% endblock %}
+{% block body_base %}
+    <link rel="stylesheet" type="text/css" href="{% static "css/f1_1.css" %}">
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.2.1.min.js"></script><!-- The reson to put the script here is to have the $ reference up for the script downbelow -->
+    <div class="container">
+	<div class="row">
+	    <div class="col-md-4">
+		{% if isAdd %}
+		    <form action="{% url 'administracion:stationAdd' %}" method="post"> {% csrf_token %}<!-- Form added 20171016 -->
+		{% else %}
+			<form action="{% url 'administracion:stationModify' %}" method="post"> {% csrf_token %}<!-- Form added 20171016 -->
+		{% endif %}
+		<fieldset><!-- The form is created on this way to use boostrap which django has not by standar -->
+		    <legend>{{ titulo }}</legend>
+		    {% for field in monitoringStationForm %}
+			{% if field.errors %}
+			    <div class="form-group error">
+				<label class="form-label">{{ field.label }}</label> 
+				<div class="controls">{{ field }}
+				    <span class="help-inline">
+					{% for error in  field.errors %}{{ error }}{% endfor %}
+				    </span>
+				</div>
+			    </div>
+			{% else %}
+			    <div class="form-group">
+				<label class="form-label">{{ field.label }}</label> 
+				<div class="controls">{{ field }}
+				    {% if field.help_text %}
+					<p class="help-inline"><small>{{ field.help_text }}</small></p>
+				    {% endif %}
+				</div>
+			    </div>
+			{% endif %}
+		    {% endfor %}
+		</fieldset>
+		{% if isAdd %}
+		    <div class="form-actions form-group">
+			<button id="add" type="submit" method="post" class="btn btn-primary" >Guardar</button>
+		    </div>
+		{% else %}
+		    <div class="form-actions form-group">
+			<button name="actionPerform" type="submit" method="post" class="btn btn-primary" value="1">Modificar</button>
+		    </div>
+		    <div class="form-actions form-group">
+			<button id="eliminate" name="actionPerform" type="submit" method="post" class="btn btn-danger" value="2">Borrar</button>
+		    </div>
+		{% endif %}
+			</form>
+	    </div>
+	    <div id="map" class="col-md-8"></div>
+	</div>
+    </div>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ keyGoogleMap|safe }};callback=initMap" >
+    </script>    
+    <script>
+     var lastMarker;
+     function initMap() {
+         var originalMapCenter = new google.maps.LatLng({{ centerLatitude|safe }}, {{ centerLength|safe }});
+	 console.log(parseFloat($("#id_centerLength").val()))
+	 var map = new google.maps.Map(document.getElementById('map'), {	     
+	     zoom: {{ zoom|safe }},
+									center: originalMapCenter
+	 });
+	 google.maps.event.addListener(map, 'click', function(event) {
+	     addMarker(event.latLng, map);
+         });
+	 lastMarker = new google.maps.Marker({
+	     position: originalMapCenter,
+	     map: map
+         });
+     }
+     function addMarker(location, map) {
+	 $("#id_latitude").val(location.lat().toFixed(7));
+	 $("#id_length").val(location.lng().toFixed(7));
+	 lastMarker.setPosition(location);
+         
+     }
+     $("#eliminate").click(function(){
+	 {{ alertForErase | safe }}
+     });
+    </script>
+    
+    {% if jsonStation %}
+	<script>
+	 var jsonStation = {{ jsonStation | safe }};
+	 $(function(){
+	     var stationIDInit = {{ stationID }};
+	     var locationStationIDInit = new google.maps.LatLng( jsonStation[stationIDInit]["latitude"], jsonStation[stationIDInit]["length"]);
+	     addMarker(locationStationIDInit, map);
+	     $("#id_nameMonitoringPlace").val(String(stationIDInit));
+	     $("#id_latitude").val(jsonStation[stationIDInit]["latitude"]);
+	     $("#id_length").val(jsonStation[stationIDInit]["length"]);
+	     $("#id_monitoringRadius").val(jsonStation[stationIDInit]["monitoringRadius"]);
+	 });
+	 $("#id_nameMonitoringPlace").change(function(){
+	     var stationID = $("#id_nameMonitoringPlace").val();
+	     var locationStationID = new google.maps.LatLng( jsonStation[stationID]["latitude"], jsonStation[stationID]["length"]);
+	     addMarker(locationStationID, map);
+	     $("#id_latitude").val(jsonStation[stationID]["latitude"]);
+	     $("#id_length").val(jsonStation[stationID]["length"]);
+	     $("#id_monitoringRadius").val(jsonStation[stationID]["monitoringRadius"]);
+	 });
+	</script>
+    {% endif %}
+    <script>
+     {{ alertSaved | safe }}
+    </script>
+{% endblock %}

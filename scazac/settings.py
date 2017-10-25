@@ -1,6 +1,7 @@
 # Modified 20170807: Usage of Naive DateTimes USE_TZ
 # Modified 20170910
 # Modified 20170925 Set encoding for the proyect to UTF8
+# Modified 20171015 Added the last app: administracionScazac
 import os
 import sys                      
 
@@ -144,6 +145,7 @@ INSTALLED_APPS = [
     "scazac",
     "calidadAire", # Modificado el 20170713
     "investigacion", # Modificado el 20170713
+    "administracionScazac",     # Modificado el 20171015
 ]
 
 # A sample logging configuration. The only tangible logging

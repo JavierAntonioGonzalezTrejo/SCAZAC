@@ -586,6 +586,7 @@ def generateGraphReport(listGraphs):
     beginDocument = """
 \\documentclass{article}
 \\usepackage{graphicx}
+\\usepackage[utf8]{inputenc}
 \\begin{document}""".decode("utf-8")
     graphDocument = r'''
 \begin{figure}[h]
